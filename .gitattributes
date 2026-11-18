@@ -1,0 +1,8 @@
+* text=auto
+# scripts do Windows precisam de CRLF para o cmd ler direito
+*.bat text eol=crlf
+# binários
+*.ttf binary
+*.otf binary
+*.png binary
+*.jpg binary

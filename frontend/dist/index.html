@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cortes Live</title>
+    <script>
+      // Aplica o tema salvo antes de desenhar a página (evita piscar).
+      try {
+        var t = localStorage.getItem("tema");
+        if (t === "claro" || t === "escuro") document.documentElement.dataset.theme = t === "claro" ? "light" : "dark";
+      } catch (e) {}
+    </script>
+    <script type="module" crossorigin src="/assets/index-gZNm-s_5.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-B74XwEfU.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

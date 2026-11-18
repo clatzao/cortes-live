@@ -1,0 +1,23 @@
+# Dados do usuário: projetos, vídeos, cortes exportados, banco, chave do Gemini, modelos de IA
+dados/
+
+# Dependências instaladas (o instalar.bat e o npm recriam)
+backend/.venv/
+frontend/node_modules/
+__pycache__/
+*.pyc
+
+# FFmpeg embutido opcional (muito grande para o repositório)
+ferramentas/
+
+# Temporários
+*.parcial*
+*.tmp
+*.log
+
+# Sistema e editores
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
