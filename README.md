@@ -28,7 +28,10 @@ Site local para cortar lives com legendas e formatos pré-definidos. Roda no seu
 
 ## Instalação (Windows 10/11)
 
-1. Copie a pasta `cortes-live` inteira para o PC (a pasta `dados` pode ficar de fora).
+1. Baixe o projeto. Com o Git e o login no GitHub (o repositório é privado), rode
+   `git clone https://github.com/clatzao/cortes-live.git`.
+   Também dá para copiar a pasta `cortes-live` inteira; a pasta `dados` pode ficar de fora.
+   O site já vem compilado em `frontend/dist`, então o PC não precisa de Node.
 2. Dê dois cliques em **`instalar.bat`**. Ele instala, se faltar:
    - **uv**: instala o Python 3.12 e as bibliotecas isoladas, sem mexer no resto do PC;
    - **FFmpeg**: via winget;
