@@ -12,8 +12,9 @@ const ATALHOS: [string[], string][] = [
   [["Esc"], "limpar seleção"],
   [["←", "→"], "1 s (Shift 5 s)"],
   [[",", "."], "0,1 s"],
+  [["+", "−"], "zoom"],
 ];
-import { api, avisar, Corte, erroTexto, Estilo, Formato, Idioma, Job, Marca, Ondas, Projeto } from "../api";
+import { api, avisar, Corte, erroTexto, Estilo, Formato, Idioma, Job, Marca, Miniaturas, Ondas, Projeto } from "../api";
 import JanelaCorte, { AbaCorte } from "../componentes/JanelaCorte";
 import PainelMomentos from "../componentes/PainelMomentos";
 import Timeline from "../componentes/Timeline";
@@ -30,6 +31,7 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [cortes, setCortes] = useState<Corte[]>([]);
   const [ondas, setOndas] = useState<Ondas | null>(null);
+  const [miniaturas, setMiniaturas] = useState<{ meta: Miniaturas; url: string } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [tempo, setTempo] = useState(0);
   const [tocando, setTocando] = useState(false);
@@ -64,6 +66,36 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
     api.cortes(id).then(setCortes).catch(() => {});
     api.ondas(id).then(setOndas).catch(() => {});
   }, [id]);
+
+  // Tira de quadros da timeline (projetos antigos: o servidor gera na primeira vez, ~5 s a cada 10 min de live)
+  useEffect(() => {
+    let vivo = true;
+    let espera: ReturnType<typeof setTimeout>;
+    const tentar = (n: number) =>
+      api
+        .miniaturas(id)
+        .then((m) => {
+          if (!vivo) return;
+          if (m) setMiniaturas({ meta: m, url: api.urlMiniaturas(id, m.versao) });
+          else if (n < 120) espera = setTimeout(() => tentar(n + 1), 3000);
+        })
+        .catch(() => {});
+    tentar(0);
+    return () => {
+      vivo = false;
+      clearTimeout(espera);
+    };
+  }, [id]);
+
+  async function ajustarCorte(cid: number, inicio: number, fim: number) {
+    try {
+      const novo = await api.editarCorte(cid, { inicio, fim });
+      setCortes((l) => l.map((x) => (x.id === novo.id ? novo : x)).sort((a, b) => a.inicio - b.inicio));
+      setCorteAtivo(cid);
+    } catch (e) {
+      avisar(erroTexto(e), "erro");
+    }
+  }
 
   // Encerra a prévia no fim do corte. O tempo da tela (relógio, texto, cortes) só é atualizado ~5x/s
   // durante a reprodução: atualizar a cada quadro re-renderizava o editor inteiro 60x/s e travava tudo.
@@ -330,6 +362,8 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
         <Timeline
           duracao={duracao}
           ondas={ondas}
+          miniaturas={miniaturas}
+          onAjustarCorte={ajustarCorte}
           tempo={tempo}
           relogio={relogio}
           tocando={tocando}

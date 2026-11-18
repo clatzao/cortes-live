@@ -193,6 +193,15 @@ export interface Job extends JobResumo {
   corte_nome: string | null;
 }
 
+export interface Miniaturas {
+  intervalo: number;
+  n: number;
+  colunas: number;
+  largura: number;
+  altura: number;
+  versao: number;
+}
+
 export interface Ondas {
   taxa: number;
   picos: number[];
@@ -283,6 +292,14 @@ export const api = {
   reprocessar: (id: number) => req<Projeto>(`/api/projetos/${id}/reprocessar`, "POST"),
   apagarProjeto: (id: number) => req<{ ok: boolean }>(`/api/projetos/${id}`, "DELETE"),
   ondas: (id: number) => req<Ondas>(`/api/projetos/${id}/ondas`),
+  /** null enquanto o servidor ainda gera a tira de quadros */
+  miniaturas: async (id: number): Promise<Miniaturas | null> => {
+    const r = await fetch(`/api/projetos/${id}/miniaturas`);
+    if (r.status === 202) return null;
+    if (!r.ok) throw new Error("Falha ao carregar as miniaturas");
+    return r.json();
+  },
+  urlMiniaturas: (id: number, versao: number) => `/api/projetos/${id}/miniaturas.jpg?v=${versao}`,
   editarProjeto: (id: number, dados: { nome?: string; idioma?: Idioma; formatos?: string[]; layout?: Layout }) =>
     req<Projeto>(`/api/projetos/${id}`, "PATCH", dados),
   transcrever: (id: number) => req<Projeto>(`/api/projetos/${id}/transcrever`, "POST"),

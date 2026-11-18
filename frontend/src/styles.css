@@ -15,6 +15,7 @@
   --tl-regua: #dde1e7;
   --tl-linha: rgba(0, 0, 0, 0.08);
   --tl-onda: #8a93a3;
+  --tl-onda-forte: #d9822b;
   --tl-corte: #4f9dff;
   --tl-corte-texto: #ffffff;
   --tl-selecao: #ffb020;
@@ -41,6 +42,7 @@
     --tl-regua: #1b1f26;
     --tl-linha: rgba(255, 255, 255, 0.06);
     --tl-onda: #5b6474;
+    --tl-onda-forte: #f59e0b;
     --tl-corte: #3b82f6;
     --tl-corte-texto: #ffffff;
     --tl-selecao: #ffb020;
@@ -65,6 +67,7 @@
   --tl-regua: #1b1f26;
   --tl-linha: rgba(255, 255, 255, 0.06);
   --tl-onda: #5b6474;
+  --tl-onda-forte: #f59e0b;
   --tl-corte: #3b82f6;
   --tl-corte-texto: #ffffff;
   --tl-selecao: #ffb020;
@@ -1700,3 +1703,6 @@ kbd {
 .auto-cortes { margin-top: 10px; gap: 6px; }
 .barra-marcados { display: flex; align-items: center; gap: 8px; padding: 6px 0 8px; border-bottom: 1px solid var(--borda); margin-bottom: 8px; }
 .momento-marca { width: 16px; height: 16px; margin: 0; flex-shrink: 0; }
+
+/* ---------------------------------------------------------------- timeline: zoom */
+.timeline-zoom { width: 110px; flex: 0 0 auto; }

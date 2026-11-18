@@ -206,3 +206,55 @@ def gerar_ondas(origem: str, destino: Path, info: dict, ctx: Contexto, base: flo
         "picos": np.round(p * 100).astype(int).tolist(),
         "rms": np.round(r * 100).astype(int).tolist(),
     }))
+
+
+# ---------------------------------------------------------------- miniaturas da timeline
+
+MINI_W, MINI_H, MINI_COLUNAS, MINI_MAX = 96, 54, 20, 1500
+_mini_gerando: set[int] = set()
+_mini_lock = threading.Lock()
+
+
+def arquivos_miniaturas(projeto_id: int) -> tuple[Path, Path]:
+    pasta = config.PROJETOS / str(projeto_id)
+    return pasta / "miniaturas.jpg", pasta / "miniaturas.json"
+
+
+def gerar_miniaturas(projeto_id: int, duracao: float) -> None:
+    """Uma imagem com um quadro a cada N segundos (lendo só os quadros-chave do proxy: rápido)."""
+    img, meta = arquivos_miniaturas(projeto_id)
+    proxy = proxy_de(projeto_id)
+    if not proxy.is_file() or duracao <= 0:
+        return
+    intervalo = max(2, -(-int(duracao) // MINI_MAX))  # teto
+    n = max(1, -(-int(duracao) // intervalo))
+    linhas = -(-n // MINI_COLUNAS)
+    tmp = img.with_name("miniaturas.parcial.jpg")
+    r = subprocess.run(
+        [config.FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-skip_frame", "nokey", "-i", str(proxy), "-an",
+         "-vf", f"fps=1/{intervalo},scale={MINI_W}:{MINI_H}:force_original_aspect_ratio=increase,"
+                f"crop={MINI_W}:{MINI_H},tile={MINI_COLUNAS}x{linhas}",
+         "-frames:v", "1", "-q:v", "5", str(tmp)],
+        capture_output=True, creationflags=config.SEM_JANELA)
+    if r.returncode == 0 and tmp.is_file():
+        tmp.replace(img)
+        meta.write_text(json.dumps({"intervalo": intervalo, "n": n, "colunas": MINI_COLUNAS,
+                                    "largura": MINI_W, "altura": MINI_H}), encoding="utf-8")
+    else:
+        apagar_arquivo(tmp)
+
+
+def miniaturas_em_segundo_plano(projeto_id: int, duracao: float) -> None:
+    with _mini_lock:
+        if projeto_id in _mini_gerando:
+            return
+        _mini_gerando.add(projeto_id)
+
+    def rodar():
+        try:
+            gerar_miniaturas(projeto_id, duracao)
+        finally:
+            with _mini_lock:
+                _mini_gerando.discard(projeto_id)
+
+    threading.Thread(target=rodar, daemon=True).start()

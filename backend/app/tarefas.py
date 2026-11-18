@@ -138,6 +138,7 @@ def importar(ctx: Contexto) -> str | None:
         parcial.replace(pasta / "proxy.mp4")
     finally:
         media.apagar_arquivo(parcial)
+    media.miniaturas_em_segundo_plano(p["id"], info["duracao"])  # tira de quadros da timeline
 
     db.executar("UPDATE projetos SET status='pronto', erro=NULL WHERE id=?", (p["id"],))
     if info["tem_audio"]:

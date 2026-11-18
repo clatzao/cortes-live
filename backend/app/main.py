@@ -292,6 +292,26 @@ def proxy(projeto_id: int):
     return FileResponse(arq, media_type="video/mp4")
 
 
+@app.get("/api/projetos/{projeto_id}/miniaturas")
+def miniaturas(projeto_id: int):
+    """Descrição da tira de quadros da timeline; gera em segundo plano se ainda não existir (202 = aguarde)."""
+    p = _projeto(projeto_id)
+    img, meta = media.arquivos_miniaturas(projeto_id)
+    if img.is_file() and meta.is_file():
+        return {**json.loads(meta.read_text(encoding="utf-8")), "versao": int(img.stat().st_mtime)}
+    if p["status"] == "pronto":
+        media.miniaturas_em_segundo_plano(projeto_id, p["duracao"] or 0)
+    return Response(status_code=202)
+
+
+@app.get("/api/projetos/{projeto_id}/miniaturas.jpg")
+def miniaturas_imagem(projeto_id: int):
+    img, _ = media.arquivos_miniaturas(projeto_id)
+    if not img.is_file():
+        raise HTTPException(404, "Miniaturas ainda não geradas")
+    return FileResponse(img, media_type="image/jpeg")
+
+
 @app.get("/api/projetos/{projeto_id}/ondas")
 def ondas(projeto_id: int):
     arq = config.PROJETOS / str(projeto_id) / "ondas.json"
