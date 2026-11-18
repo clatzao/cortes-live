@@ -22,18 +22,21 @@ export default function LayoutFacecam({ projeto, corte, marca, onFechar, onSalvo
   const area = useRef<HTMLDivElement>(null);
   const inicio = useRef<[number, number] | null>(null);
   const ultima = useRef<string | null>(null);
+  const pedido = useRef(0);
 
   useEffect(() => {
     const id = setTimeout(() => {
+      const meu = ++pedido.current;
       api
         .previaFormato({ corte_id: corte.id, formato: "vertical_split", t: 1, layout })
         .then((u) => {
+          if (meu !== pedido.current) return URL.revokeObjectURL(u); // chegou uma mais nova
           if (ultima.current) URL.revokeObjectURL(ultima.current);
           ultima.current = u;
           setPrevia(u);
         })
         .catch((e) => avisar(erroTexto(e), "erro"));
-    }, 400);
+    }, 250);
     return () => clearTimeout(id);
   }, [layout, corte.id]);
 

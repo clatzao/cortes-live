@@ -38,15 +38,18 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
   const [projetoAtual, setProjetoAtual] = useState(projeto);
   const [sujo, setSujo] = useState(false);
   const ultima = useRef<string | null>(null);
+  const pedido = useRef(0);
   const areaRecorte = useRef<HTMLDivElement>(null);
 
   // Prévia do quadro final (espera 400 ms parado)
   useEffect(() => {
     const id = setTimeout(() => {
+      const meu = ++pedido.current;
       setGerando(true);
       api
         .previaFormato({ corte_id: corte.id, formato: verFormato, t, crop_x: cropX, gancho, recursos })
         .then((u) => {
+          if (meu !== pedido.current) return URL.revokeObjectURL(u); // chegou uma mais nova
           if (ultima.current) URL.revokeObjectURL(ultima.current);
           ultima.current = u;
           setPrevia(u);
@@ -54,7 +57,7 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
         })
         .catch((e) => setErroPrevia(erroTexto(e)))
         .finally(() => setGerando(false));
-    }, 400);
+    }, 250);
     return () => clearTimeout(id);
   }, [corte.id, verFormato, t, cropX, gancho, recursos, projetoAtual.layout_efetivo]);
 

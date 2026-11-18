@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
 
-from . import ajustes, config, db, formatos, hardware, jobs, legendas, marca, tempo, thumbs, transcricao, viral
+from . import ajustes, config, db, formatos, hardware, jobs, legendas, marca, media, tempo, thumbs, transcricao, viral
 from . import tarefas  # registra os jobs na fila
 
 app = FastAPI(title="Cortes Live")
@@ -232,7 +232,7 @@ def quadro_projeto(projeto_id: int, t: float = 0, largura: int = 960):
         raise HTTPException(400, "Projeto ainda não está pronto.")
     largura = max(160, min(1920, largura))
     altura = round(largura * p["altura"] / p["largura"])
-    return _jpeg(_quadro(p["caminho_original"], t, largura, altura), 1080)
+    return _jpeg(_quadro(_fonte_rapida(p), t, largura, altura), 1080)
 
 
 @app.post("/api/projetos/{projeto_id}/transcrever")
@@ -434,9 +434,15 @@ def restaurar_legenda(corte_id: int):
     return ver_legenda(corte_id)
 
 
+def _fonte_rapida(p: dict) -> str:
+    """Para quadros de tela: o proxy (leve) se existir; o original pode ser AV1/HEVC e demorar ~1 s por quadro."""
+    proxy = media.proxy_de(p["id"])
+    return str(proxy) if proxy.is_file() else p["caminho_original"]
+
+
 def _quadro(origem: str, instante: float, largura: int, altura: int) -> Image.Image:
     r = subprocess.run([config.FFMPEG, "-hide_banner", "-loglevel", "error", "-ss", f"{max(0, instante):.3f}",
-                        "-i", origem, "-frames:v", "1", "-f", "image2pipe", "-vcodec", "png", "-"],
+                        "-i", origem, "-frames:v", "1", "-f", "image2pipe", "-vcodec", "bmp", "-"],
                        capture_output=True, creationflags=config.SEM_JANELA)
     if r.returncode != 0 or not r.stdout:
         return Image.new("RGB", (largura, altura), (20, 20, 20))
@@ -459,7 +465,7 @@ def previa_corte(corte_id: int, t: float, estilo: str | None = None):
     p = _projeto(c["projeto_id"])
     if p["status"] != "pronto":
         raise HTTPException(400, "Projeto ainda não está pronto.")
-    fundo = _quadro(p["caminho_original"], t, p["largura"], p["altura"])
+    fundo = _quadro(_fonte_rapida(p), t, p["largura"], p["altura"])
     palavras = tarefas.palavras_do_corte(c) or []
     img = legendas.compor(fundo, palavras, legendas.obter_estilo(estilo or c["estilo"]), t - c["inicio"])
     return _jpeg(img)
@@ -501,7 +507,7 @@ def previa_estilo(dados: PreviaEstilo):
     if dados.projeto_id:
         p = db.um("SELECT * FROM projetos WHERE id=? AND status='pronto'", (dados.projeto_id,))
         if p:
-            fundo = _quadro(p["caminho_original"], (p["duracao"] or 0) / 3, w, h)
+            fundo = _quadro(_fonte_rapida(p), (p["duracao"] or 0) / 3, w, h)
     return _jpeg(legendas.previa_estilo(estilo, w, h, fundo), 640)
 
 
@@ -703,6 +709,7 @@ def abrir_saida(job_id: int):
 
 @app.post("/api/abrir-exportados")
 def abrir_exportados():
+    config.EXPORTADOS.mkdir(parents=True, exist_ok=True)
     if os.name == "nt":
         os.startfile(config.EXPORTADOS)  # noqa: S606 - pasta fixa do próprio programa
     return {"ok": True}
@@ -712,9 +719,7 @@ def abrir_exportados():
 
 def _arquivo_thumb(c: dict, tamanho: str) -> Path:
     p = _projeto(c["projeto_id"])
-    pasta = config.EXPORTADOS / f"{p['id']}_{tarefas.nome_seguro(p['nome'], 50)}"
-    pasta.mkdir(parents=True, exist_ok=True)
-    return pasta / f"{tarefas.nome_seguro(c['nome'] or 'corte')}_{c['id']}_thumb_{tamanho}.png"
+    return tarefas.pasta_saida(p, c) / f"Thumbnail {tamanho}.png"
 
 
 def _validar_tamanho(tamanho: str) -> None:

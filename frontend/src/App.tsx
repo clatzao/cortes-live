@@ -52,7 +52,19 @@ export default function App() {
   // Fila atualizada a cada 1,5 s (servidor local, custo baixo).
   useEffect(() => {
     let vivo = true;
-    const tick = () => api.fila().then((f) => vivo && setFila(f)).catch(() => {});
+    let anterior = "";
+    // só atualiza se algo mudou: cada atualização re-renderiza a página aberta (ex.: o editor)
+    const tick = () =>
+      api
+        .fila()
+        .then((f) => {
+          const atual = JSON.stringify(f);
+          if (vivo && atual !== anterior) {
+            anterior = atual;
+            setFila(f);
+          }
+        })
+        .catch(() => {});
     tick();
     const t = setInterval(tick, 1500);
     return () => {

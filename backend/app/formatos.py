@@ -107,6 +107,7 @@ class Montagem:
     musica: tuple[str, float, bool] | None = None   # (arquivo, volume, abaixar na fala)
     intro: Extra | None = None
     outro: Extra | None = None
+    fonte_reduzida: bool = False  # prévia lendo o proxy: escala de volta para largura x altura
 
 
 def comando(m: Montagem, video_args: list[str], destino: str, previa: bool = False) -> tuple[list[str], float]:
@@ -125,7 +126,8 @@ def comando(m: Montagem, video_args: list[str], destino: str, previa: bool = Fal
 
     dur = 0.04 if previa else m.duracao
     principal = entrada("-ss", f"{m.inicio:.3f}", "-t", f"{dur:.3f}", "-i", m.origem)
-    filtros.append(filtro_video(m.fmt, m.largura, m.altura, m.crop_x, m.layout, f"[{principal}:v]", "[v0]"))
+    ent = f"[{principal}:v]" + (f"scale={m.largura}:{m.altura}," if m.fonte_reduzida else "")
+    filtros.append(filtro_video(m.fmt, m.largura, m.altura, m.crop_x, m.layout, ent, "[v0]"))
     atual = "[v0]"
 
     def sobrepor(idx: int, x: int, y: int, rotulo: str, rgba: bool = True) -> None:

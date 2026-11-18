@@ -1,5 +1,6 @@
 """Operações de vídeo com FFmpeg: análise, proxy de preview, forma de onda e cortes."""
 import collections
+import functools
 import json
 import os
 import subprocess
@@ -16,6 +17,21 @@ from .jobs import Cancelado, Contexto
 def _exigir_ffmpeg() -> None:
     if not config.FFMPEG or not config.FFPROBE:
         raise RuntimeError("FFmpeg não encontrado. Rode o instalar.bat ou instale o FFmpeg.")
+
+
+@functools.lru_cache(maxsize=32)
+def _analisar_cache(caminho: str, mtime: int, tamanho: int) -> dict:
+    return analisar(caminho)
+
+
+def analisar_rapido(caminho: str) -> dict:
+    """analisar() guardado em memória enquanto o arquivo não mudar."""
+    st = os.stat(caminho)
+    return dict(_analisar_cache(caminho, st.st_mtime_ns, st.st_size))
+
+
+def proxy_de(projeto_id: int) -> Path:
+    return config.PROJETOS / str(projeto_id) / "proxy.mp4"
 
 
 def analisar(caminho: str) -> dict:

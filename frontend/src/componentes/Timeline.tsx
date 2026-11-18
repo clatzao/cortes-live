@@ -6,6 +6,8 @@ interface Props {
   duracao: number;
   ondas: Ondas | null;
   tempo: number;
+  /** tempo exato do vídeo, lido a cada quadro só para desenhar o cursor (sem re-renderizar a tela) */
+  relogio: () => number;
   tocando: boolean;
   cortes: Corte[];
   corteAtivo: number | null;
@@ -21,19 +23,28 @@ const Y_FAIXA = 40; // faixa com os cortes vai de Y_REGUA até Y_FAIXA
 const PASSOS = [0.1, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200];
 const SPAN_MIN = 2;
 
-function cor(nome: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(nome).trim() || "#888";
+const NOMES_CORES = ["--tl-fundo", "--tl-regua", "--tl-linha", "--texto-sutil", "--tl-onda", "--destaque", "--tl-corte",
+  "--tl-corte-texto", "--tl-selecao", "--tl-cabeca"] as const;
+type Cores = Record<(typeof NOMES_CORES)[number], string>;
+
+/** Lê as cores do tema uma vez (getComputedStyle a cada quadro era caro). */
+function lerCores(): Cores {
+  const css = getComputedStyle(document.documentElement);
+  return Object.fromEntries(NOMES_CORES.map((n) => [n, css.getPropertyValue(n).trim() || "#888"])) as Cores;
 }
 
 export default function Timeline(p: Props) {
   const embrulho = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const cursor = useRef<HTMLCanvasElement>(null);
   const [largura, setLargura] = useState(800);
   const [vista, setVista] = useState({ a: 0, b: Math.max(p.duracao, SPAN_MIN) });
   const [versaoTema, setVersaoTema] = useState(0);
   const arraste = useRef<{ x0: number; t0: number; movendo: boolean } | null>(null);
 
   const span = vista.b - vista.a;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cores = useMemo(lerCores, [versaoTema]);
   const picoMax = useMemo(() => {
     let m = 1;
     for (const v of p.ondas?.picos ?? []) if (v > m) m = v;
@@ -114,15 +125,15 @@ export default function Timeline(p: Props) {
     const pps = w / span;
     const x = (t: number) => (t - vista.a) * pps;
 
-    c.fillStyle = cor("--tl-fundo");
+    c.fillStyle = cores["--tl-fundo"];
     c.fillRect(0, 0, w, ALTURA);
 
     // Régua
     const passo = PASSOS.find((s) => s * pps >= 90) ?? 7200;
-    c.fillStyle = cor("--tl-regua");
+    c.fillStyle = cores["--tl-regua"];
     c.fillRect(0, 0, w, Y_REGUA);
-    c.strokeStyle = cor("--tl-linha");
-    c.fillStyle = cor("--texto-sutil");
+    c.strokeStyle = cores["--tl-linha"];
+    c.fillStyle = cores["--texto-sutil"];
     c.font = "11px system-ui, sans-serif";
     c.textBaseline = "middle";
     c.beginPath();
@@ -139,7 +150,7 @@ export default function Timeline(p: Props) {
     const alturaOnda = (ALTURA - Y_FAIXA) / 2 - 4;
     if (p.ondas) {
       const { taxa, picos } = p.ondas;
-      c.fillStyle = cor("--tl-onda");
+      c.fillStyle = cores["--tl-onda"];
       for (let px = 0; px < w; px++) {
         const t1 = vista.a + px / pps;
         const i1 = Math.floor(t1 * taxa);
@@ -158,13 +169,13 @@ export default function Timeline(p: Props) {
       const x1 = Math.max(0, x(corte.inicio));
       const x2 = Math.min(w, x(corte.fim));
       const ativo = corte.id === p.corteAtivo;
-      c.fillStyle = cor(ativo ? "--destaque" : "--tl-corte");
+      c.fillStyle = cores[ativo ? "--destaque" : "--tl-corte"];
       c.fillRect(x1, Y_REGUA + 2, Math.max(2, x2 - x1), Y_FAIXA - Y_REGUA - 4);
       c.globalAlpha = ativo ? 0.22 : 0.12;
       c.fillRect(x1, Y_FAIXA, Math.max(2, x2 - x1), ALTURA - Y_FAIXA);
       c.globalAlpha = 1;
       if (x2 - x1 > 40) {
-        c.fillStyle = cor("--tl-corte-texto");
+        c.fillStyle = cores["--tl-corte-texto"];
         c.save();
         c.beginPath();
         c.rect(x1, Y_REGUA, x2 - x1 - 4, Y_FAIXA - Y_REGUA);
@@ -176,10 +187,10 @@ export default function Timeline(p: Props) {
 
     // Seleção atual
     const { inicio, fim } = p.selecao;
-    c.strokeStyle = cor("--tl-selecao");
+    c.strokeStyle = cores["--tl-selecao"];
     c.lineWidth = 2;
     if (inicio !== null && fim !== null) {
-      c.fillStyle = cor("--tl-selecao");
+      c.fillStyle = cores["--tl-selecao"];
       c.globalAlpha = 0.25;
       c.fillRect(x(inicio), Y_FAIXA, x(fim) - x(inicio), ALTURA - Y_FAIXA);
       c.globalAlpha = 1;
@@ -193,24 +204,51 @@ export default function Timeline(p: Props) {
     }
     c.lineWidth = 1;
 
-    // Cursor de reprodução
-    const xc = x(p.tempo);
-    if (xc >= 0 && xc <= w) {
-      c.strokeStyle = cor("--tl-cabeca");
-      c.fillStyle = cor("--tl-cabeca");
-      c.lineWidth = 2;
-      c.beginPath();
-      c.moveTo(xc, 0);
-      c.lineTo(xc, ALTURA);
-      c.stroke();
-      c.beginPath();
-      c.moveTo(xc - 6, 0);
-      c.lineTo(xc + 6, 0);
-      c.lineTo(xc, 8);
-      c.fill();
-      c.lineWidth = 1;
-    }
-  }, [largura, vista, p.tempo, p.ondas, p.cortes, p.selecao, p.corteAtivo, versaoTema, span, picoMax]);
+  }, [largura, vista, p.ondas, p.cortes, p.selecao, p.corteAtivo, cores, span, picoMax]);
+
+  // Cursor de reprodução numa camada própria, redesenhada a cada quadro sem tocar no resto
+  const vistaRef = useRef(vista);
+  vistaRef.current = vista;
+  const relogio = useRef(p.relogio);
+  relogio.current = p.relogio;
+  useEffect(() => {
+    const el = cursor.current;
+    if (!el) return;
+    const dpr = window.devicePixelRatio || 1;
+    el.width = Math.round(largura * dpr);
+    el.height = Math.round(ALTURA * dpr);
+    const c = el.getContext("2d")!;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    let raf = 0;
+    let ultimo = "";
+    const laco = () => {
+      const { a, b } = vistaRef.current;
+      const t = relogio.current();
+      const xc = ((t - a) / (b - a)) * largura;
+      const chave = xc.toFixed(1);
+      if (chave !== ultimo) {
+        ultimo = chave;
+        c.clearRect(0, 0, largura, ALTURA);
+        if (xc >= 0 && xc <= largura) {
+          c.strokeStyle = cores["--tl-cabeca"];
+          c.fillStyle = cores["--tl-cabeca"];
+          c.lineWidth = 2;
+          c.beginPath();
+          c.moveTo(xc, 0);
+          c.lineTo(xc, ALTURA);
+          c.stroke();
+          c.beginPath();
+          c.moveTo(xc - 6, 0);
+          c.lineTo(xc + 6, 0);
+          c.lineTo(xc, 8);
+          c.fill();
+        }
+      }
+      raf = requestAnimationFrame(laco);
+    };
+    raf = requestAnimationFrame(laco);
+    return () => cancelAnimationFrame(raf);
+  }, [largura, cores, vista]);
 
   function tempoEm(clientX: number): number {
     const r = canvas.current!.getBoundingClientRect();
@@ -253,6 +291,7 @@ export default function Timeline(p: Props) {
 
   return (
     <div className="timeline" ref={embrulho}>
+      <div className="timeline-telas">
       <canvas
         ref={canvas}
         style={{ width: "100%", height: ALTURA, display: "block", cursor: "crosshair", touchAction: "none" }}
@@ -261,6 +300,8 @@ export default function Timeline(p: Props) {
         onPointerUp={aoSoltar}
         onPointerCancel={() => (arraste.current = null)}
       />
+      <canvas ref={cursor} className="timeline-cursor" style={{ width: "100%", height: ALTURA }} aria-hidden />
+      </div>
       <div className="timeline-controles">
         <button className="btn btn-peq" onClick={() => zoom(0.5, p.tempo)} title="Aproximar">
           +

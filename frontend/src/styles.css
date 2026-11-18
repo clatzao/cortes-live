@@ -1689,3 +1689,9 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------------- desempenho */
+.timeline-telas { position: relative; }
+.timeline-cursor { position: absolute; inset: 0; pointer-events: none; display: block; }
+/* lives longas têm milhares de frases: o navegador só desenha as que estão visíveis */
+.texto-transcricao .segmento { content-visibility: auto; contain-intrinsic-size: auto 3.2em; }

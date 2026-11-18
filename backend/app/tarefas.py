@@ -16,6 +16,19 @@ def nome_seguro(txt: str, limite: int = 60) -> str:
     return (limpo[:limite] or "sem_nome").rstrip("._")
 
 
+def nome_legivel(txt: str, limite: int = 60) -> str:
+    """Nome de pasta/arquivo com espaços (para as pastas que o usuário abre)."""
+    limpo = re.sub(r"\s+", " ", _INVALIDOS.sub("", txt)).strip().strip(".")
+    return (limpo[:limite].rstrip(" .") or "sem nome")
+
+
+def pasta_saida(p: dict, c: dict) -> Path:
+    """Vídeos/Cortes Live/<projeto>/<corte>: tudo de um corte (formatos, .srt, thumbs) junto."""
+    pasta = config.EXPORTADOS / nome_legivel(p["nome"], 60) / f"{nome_legivel(c['nome'] or 'corte', 60)} ({c['id']})"
+    pasta.mkdir(parents=True, exist_ok=True)
+    return pasta
+
+
 def pasta_projeto(projeto_id: int) -> Path:
     p = config.PROJETOS / str(projeto_id)
     p.mkdir(parents=True, exist_ok=True)
@@ -149,9 +162,8 @@ def exportar(ctx: Contexto) -> str:
     if fmt not in formatos.FORMATOS:
         raise RuntimeError(f"Formato desconhecido: {fmt}")
 
-    pasta = config.EXPORTADOS / f"{p['id']}_{nome_seguro(p['nome'], 50)}"
-    pasta.mkdir(parents=True, exist_ok=True)
-    destino = pasta / f"{nome_seguro(c['nome'] or 'corte')}_{c['id']}_{fmt}.mp4"
+    pasta = pasta_saida(p, c)
+    destino = pasta / f"{nome_legivel(formatos.FORMATOS[fmt]['nome'].replace(':', 'x'), 40)}.mp4"
     parcial = destino.with_name(destino.stem + ".parcial.mp4")
     temporaria = pasta_projeto(p["id"]) / f"export_{c['id']}_{ctx.id}"
     try:
@@ -192,13 +204,15 @@ def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | N
     sobrescrever = sobrescrever or {}
     pasta.mkdir(parents=True, exist_ok=True)
     m = marca.ler()
-    info = media.analisar(p["caminho_original"])
+    previa = previa_t is not None
+    proxy = media.proxy_de(p["id"])
+    rapida = previa and proxy.is_file()
+    info = media.analisar_rapido(p["caminho_original"])
     layout = marca.validar_layout(sobrescrever["layout"]) if sobrescrever.get("layout") else layout_do_projeto(p, m)
     ow, oh = formatos.tamanho_saida(fmt, p["largura"], p["altura"])
     duracao = c["fim"] - c["inicio"]
-    previa = previa_t is not None
     mt = formatos.Montagem(
-        origem=p["caminho_original"], inicio=c["inicio"] + (previa_t or 0), duracao=duracao, fmt=fmt,
+        origem=str(proxy) if rapida else p["caminho_original"], fonte_reduzida=rapida, inicio=c["inicio"] + (previa_t or 0), duracao=duracao, fmt=fmt,
         largura=p["largura"], altura=p["altura"], fps=p["fps"] or 30, tem_audio=info["tem_audio"],
         crop_x=float(sobrescrever.get("crop_x", c["crop_x"] if c.get("crop_x") is not None else 0.5)),
         layout=layout,

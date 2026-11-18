@@ -44,6 +44,8 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
   const [janela, setJanela] = useState<{ corteId: number; aba: AbaCorte } | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const fimPrevia = useRef<number | null>(null);
+  const tempoMostrado = useRef(0);
+  const relogio = useCallback(() => video.current?.currentTime ?? tempoMostrado.current, []);
 
   useEffect(() => {
     api.estilos().then(setEstilos).catch(() => {});
@@ -63,14 +65,19 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
     api.ondas(id).then(setOndas).catch(() => {});
   }, [id]);
 
-  // Atualiza o cursor a cada quadro e encerra a prévia no fim do corte
+  // Encerra a prévia no fim do corte. O tempo da tela (relógio, texto, cortes) só é atualizado ~5x/s
+  // durante a reprodução: atualizar a cada quadro re-renderizava o editor inteiro 60x/s e travava tudo.
+  // O cursor da timeline lê o vídeo direto, então continua suave.
   useEffect(() => {
     let raf = 0;
     const laco = () => {
       const v = video.current;
       if (v) {
         const t = v.currentTime;
-        setTempo((ant) => (Math.abs(ant - t) > 0.005 ? t : ant));
+        if (Math.abs(tempoMostrado.current - t) > (v.paused ? 0.005 : 0.2)) {
+          tempoMostrado.current = t;
+          setTempo(t);
+        }
         if (fimPrevia.current !== null && t >= fimPrevia.current) {
           v.pause();
           fimPrevia.current = null;
@@ -89,6 +96,7 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
       const v = video.current;
       const alvo = Math.min(Math.max(0, t), duracao);
       if (v) v.currentTime = alvo;
+      tempoMostrado.current = alvo;
       setTempo(alvo);
     },
     [duracao],
@@ -137,10 +145,10 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
       avisar("Marque o início (tecla I) ou arraste na timeline.", "erro");
       return;
     }
-    if (fim === null) fim = tempo;
+    if (fim === null) fim = relogio();
     if (fim < inicio) [inicio, fim] = [fim, inicio];
     if (await adicionarCorte(inicio, fim)) setSelecao({ inicio: null, fim: null });
-  }, [selecao, tempo, adicionarCorte]);
+  }, [selecao, relogio, adicionarCorte]);
 
   async function transcrever() {
     try {
@@ -167,6 +175,7 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
       if (alvo.closest("input, textarea, select, [contenteditable]")) return;
       if (document.querySelector(".modal-fundo")) return; // editor de legenda aberto
       const k = e.key.toLowerCase();
+      const tempo = relogio();
       if (k === " ") {
         e.preventDefault();
         alternarPlay();
@@ -184,7 +193,7 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
     };
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
-  }, [tempo, alternarPlay, criarCorte, buscar]);
+  }, [relogio, alternarPlay, criarCorte, buscar]);
 
   async function criarLote() {
     try {
@@ -293,11 +302,11 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
             {formatar(tempo)} / {formatar(duracao)}
           </span>
           <div className="separador" />
-          <button className="btn" onClick={() => setSelecao((s) => ({ ...s, inicio: tempo }))}
+          <button className="btn" onClick={() => setSelecao((s) => ({ ...s, inicio: relogio() }))}
             title="Marcar o início do corte aqui (tecla I)">
             <ArrowRightToLine size={15} /> Início
           </button>
-          <button className="btn" onClick={() => setSelecao((s) => ({ ...s, fim: tempo }))}
+          <button className="btn" onClick={() => setSelecao((s) => ({ ...s, fim: relogio() }))}
             title="Marcar o fim do corte aqui (tecla O)">
             Fim <ArrowLeftToLine size={15} />
           </button>
@@ -316,6 +325,7 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
           duracao={duracao}
           ondas={ondas}
           tempo={tempo}
+          relogio={relogio}
           tocando={tocando}
           cortes={cortes}
           corteAtivo={corteAtivo}
