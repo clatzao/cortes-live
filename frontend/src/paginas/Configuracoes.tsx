@@ -224,28 +224,9 @@ export default function Configuracoes({ hw, onHw }: { hw: Hardware | null; onHw:
                 </select>
               </label>
               {!teste && ajustes.gemini_tem_chave && <span className="sutil">Clique em "Testar" para ver a lista de modelos.</span>}
-              <div className="margens">
-                <label>
-                  Cortes de
-                  <input type="number" min={5} max={600} defaultValue={ajustes.viral_min}
-                    onBlur={(e) => salvar({ viral_min: Number(e.target.value) })} />
-                </label>
-                <label>
-                  até
-                  <input type="number" min={5} max={900} defaultValue={ajustes.viral_max}
-                    onBlur={(e) => salvar({ viral_max: Number(e.target.value) })} />
-                  s
-                </label>
-                <label>
-                  Quantos
-                  <input type="number" min={1} max={50} defaultValue={ajustes.viral_qtd}
-                    onBlur={(e) => salvar({ viral_qtd: Number(e.target.value) })} />
-                </label>
-              </div>
-              <label className="corte-check">
-                <input type="checkbox" checked={ajustes.viral_auto} onChange={(e) => salvar({ viral_auto: e.target.checked })} />
-                Procurar momentos sozinho quando a transcrição terminar
-              </label>
+              <p className="sutil">
+                Duração e quantidade dos momentos ficam em <a href="#/ajustes/padrao">Padrão dos cortes</a>.
+              </p>
             </section>
           )}
         </div>

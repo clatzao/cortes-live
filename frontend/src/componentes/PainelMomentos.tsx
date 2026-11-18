@@ -11,6 +11,7 @@ interface Props {
   onSeek: (t: number) => void;
   onPrevia: (inicio: number, fim: number) => void;
   onCorteCriado: (c: Corte) => void;
+  onCortesCriados: (lista: Corte[]) => void;
 }
 
 function corNota(n: number): string {
@@ -19,12 +20,13 @@ function corNota(n: number): string {
   return "nota-baixa";
 }
 
-export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek, onPrevia, onCorteCriado }: Props) {
+export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek, onPrevia, onCorteCriado, onCortesCriados }: Props) {
   const [lista, setLista] = useState<Sugestao[] | null>(null);
   const [min, setMin] = useState(30);
   const [max, setMax] = useState(60);
   const [qtd, setQtd] = useState(10);
   const [enviando, setEnviando] = useState(false);
+  const [marcados, setMarcados] = useState<Set<number>>(new Set());
 
   const ativo = job?.status === "na_fila" || job?.status === "executando";
 
@@ -43,7 +45,34 @@ export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek,
   useEffect(() => {
     if (ativo) return;
     api.sugestoes(projetoId).then(setLista).catch(() => setLista([]));
+    setMarcados(new Set());
   }, [projetoId, ativo, job?.id]);
+
+  const pendentes = (lista ?? []).filter((s) => s.status !== "aceita");
+  const todosMarcados = pendentes.length > 0 && pendentes.every((s) => marcados.has(s.id));
+
+  function marcar(id: number, sim: boolean) {
+    setMarcados((m) => {
+      const n = new Set(m);
+      if (sim) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+  }
+
+  async function aceitarMarcados() {
+    const ids = pendentes.filter((s) => marcados.has(s.id)).map((s) => s.id);
+    if (!ids.length) return;
+    try {
+      const criados = await api.aceitarSugestoes(projetoId, ids);
+      onCortesCriados(criados);
+      api.sugestoes(projetoId).then(setLista).catch(() => {});
+      setMarcados(new Set());
+      avisar(`${criados.length} corte(s) criado(s). Veja na aba Cortes.`);
+    } catch (e) {
+      avisar(erroTexto(e), "erro");
+    }
+  }
 
   async function analisar() {
     if (max < min) {
@@ -117,6 +146,20 @@ export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek,
         {job?.status === "erro" && <p className="erro-texto">{job.mensagem}</p>}
       </div>
 
+      {pendentes.length > 1 && (
+        <div className="barra-marcados">
+          <label className="corte-check">
+            <input type="checkbox" checked={todosMarcados}
+              onChange={(e) => setMarcados(e.target.checked ? new Set(pendentes.map((s) => s.id)) : new Set())} />
+            Marcar todos
+          </label>
+          <button className="btn btn-peq btn-primario empurrar-direita" disabled={!marcados.size} onClick={aceitarMarcados}
+            title="Cria um corte para cada momento marcado">
+            <Scissors size={13} /> Virar {marcados.size || ""} corte(s)
+          </button>
+        </div>
+      )}
+
       <div className="lista-momentos">
         {lista?.length === 0 && !ativo && temTranscricao && (
           <p className="sutil">Nenhuma sugestão ainda. Clique em "Encontrar momentos virais".</p>
@@ -124,6 +167,10 @@ export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek,
         {lista?.map((s) => (
           <div key={s.id} className={`momento ${s.status === "aceita" ? "momento-aceito" : ""}`}>
             <div className="momento-topo">
+              {s.status !== "aceita" && (
+                <input type="checkbox" className="momento-marca" checked={marcados.has(s.id)}
+                  onChange={(e) => marcar(s.id, e.target.checked)} aria-label={`Marcar ${s.nome}`} />
+              )}
               <span className={`nota ${corNota(s.nota)}`} title="Chance de viralizar (0 a 100)">
                 {s.nota}
               </span>

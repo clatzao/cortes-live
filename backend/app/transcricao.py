@@ -221,7 +221,7 @@ def transcrever(ctx: Contexto) -> str | None:
 
         resultado["parcial"] = False
         _salvar(final, resultado)
-        if ajustes.ler()["viral_auto"] and segmentos:
+        if (ajustes.ler()["viral_auto"] or p.get("auto_cortes")) and segmentos:
             jobs.enfileirar("analisar", projeto_id=p["id"])  # momentos virais logo em seguida
         return str(final)
     finally:

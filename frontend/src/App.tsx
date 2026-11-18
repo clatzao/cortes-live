@@ -18,6 +18,7 @@ function lerRota(): Rota {
   if (m) return { pagina: "projeto", id: Number(m[1]) };
   if (h.startsWith("fila")) return { pagina: "fila" };
   // endereços antigos continuam funcionando
+  if (h.startsWith("ajustes/padrao")) return { pagina: "ajustes", aba: "padrao" };
   if (h.startsWith("legendas") || h.startsWith("ajustes/legendas")) return { pagina: "ajustes", aba: "legendas" };
   if (h.startsWith("marca") || h.startsWith("ajustes/marca")) return { pagina: "ajustes", aba: "marca" };
   if (h.startsWith("config") || h.startsWith("ajustes")) return { pagina: "ajustes", aba: "sistema" };
@@ -127,7 +128,7 @@ export default function App() {
           <a href="#/" className={rota.pagina === "inicio" || rota.pagina === "projeto" ? "ativo" : ""}>
             Projetos
           </a>
-          <a href="#/ajustes/legendas" className={rota.pagina === "ajustes" ? "ativo" : ""}>
+          <a href="#/ajustes/padrao" className={rota.pagina === "ajustes" ? "ativo" : ""}>
             Ajustes
           </a>
         </nav>

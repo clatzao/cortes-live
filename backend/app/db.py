@@ -72,7 +72,8 @@ _adicionar_coluna("projetos", "layout", "TEXT")    # retângulos câmera/jogo (J
 _adicionar_coluna("cortes", "formatos", "TEXT")    # JSON ou NULL = do projeto
 _adicionar_coluna("cortes", "crop_x", "REAL NOT NULL DEFAULT 0.5")  # centro do recorte (fração da largura)
 _adicionar_coluna("cortes", "gancho", "TEXT")      # título no topo do vídeo
-_adicionar_coluna("cortes", "recursos", "TEXT")    # {"logo","intro","outro","musica"} ou NULL = padrão
+_adicionar_coluna("cortes", "recursos", "TEXT")
+_adicionar_coluna("projetos", "auto_cortes", "INTEGER NOT NULL DEFAULT 0")  # cria cortes sozinho após a análise    # {"logo","intro","outro","musica"} ou NULL = padrão
 
 _conn.executescript(
     """

@@ -20,6 +20,10 @@ PADRAO = {
     "viral_max": 60,
     "viral_qtd": 10,
     "viral_auto": True,          # analisar sozinho quando a transcrição terminar
+    # Predefinição de todo corte novo (formatos e extras ficam na marca: formatos_padrao / <extra>.padrao)
+    "estilo_padrao": "classico",
+    "legenda_padrao": True,
+    "auto_cortes": False,        # última escolha da caixinha "criar cortes automaticamente" ao importar
 }
 
 
@@ -64,6 +68,11 @@ def salvar(novos: dict) -> dict:
         atual["viral_qtd"] = _inteiro(novos["viral_qtd"], 1, 50, 10)
     if "viral_auto" in novos:
         atual["viral_auto"] = bool(novos["viral_auto"])
+    if isinstance(novos.get("estilo_padrao"), str) and novos["estilo_padrao"].strip():
+        atual["estilo_padrao"] = novos["estilo_padrao"].strip()[:60]
+    for k in ("legenda_padrao", "auto_cortes"):
+        if k in novos and novos[k] is not None:
+            atual[k] = bool(novos[k])
     _gravar(atual)
     return atual
 

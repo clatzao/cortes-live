@@ -392,7 +392,7 @@ def analisar(ctx: Contexto) -> str:
             candidatos = []
             aviso = f"Gemini indisponível — sugestões só por volume e palavras-chave. Motivo: {e}"
     else:
-        aviso = "Sem chave do Gemini — sugestões só por volume e palavras-chave. Configure a chave em Configurações."
+        aviso = "Sem chave do Gemini — sugestões só por volume e palavras-chave. Configure a chave em Ajustes → IA e hardware."
 
     if not candidatos:
         origem = "sinais"
@@ -417,4 +417,10 @@ def analisar(ctx: Contexto) -> str:
                     "criado_em) VALUES (?,?,?,?,?,?,?,?,?,?)",
                     (p["id"], s["inicio"], s["fim"], s["nota"], s["energia"], s["motivo"], nome, s["gancho"],
                      origem, agora))
+    if p.get("auto_cortes"):
+        from . import cortes  # import tardio: cortes -> legendas, sem ciclo com viral
+        novas = db.listar("SELECT * FROM sugestoes WHERE projeto_id=? AND status='nova' ORDER BY inicio", (p["id"],))
+        criados = sum(1 for s in novas if cortes.aceitar_sugestao(s, duracao))
+        db.executar("UPDATE projetos SET auto_cortes=0 WHERE id=?", (p["id"],))
+        return f"{len(finais)} sugestão(ões); {criados} corte(s) criados automaticamente. {aviso}"
     return f"{len(finais)} sugestão(ões). {aviso}"

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Check, Download, Film, FolderOpen, Loader2, RotateCcw, Scissors, Sparkles, Trash2, X } from "lucide-react";
+import { Check, Download, Film, FolderOpen, Loader2, RotateCcw, Scissors, Sparkles, Trash2, Upload, Wand2, X } from "lucide-react";
 import { api, avisar, erroTexto, Projeto } from "../api";
 import Progresso from "../componentes/Progresso";
 import { duracaoCurta } from "../tempo";
@@ -44,8 +44,13 @@ export default function Inicio() {
   const [projetos, setProjetos] = useState<Projeto[] | null>(null);
   const [entrada, setEntrada] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [auto, setAuto] = useState(false);
 
   const carregar = () => api.projetos().then(setProjetos).catch(() => {});
+
+  useEffect(() => {
+    api.ajustes().then((a) => setAuto(a.auto_cortes)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     carregar();
@@ -58,9 +63,11 @@ export default function Inicio() {
     if (!entrada.trim()) return;
     setEnviando(true);
     try {
-      await api.criarProjeto(entrada.trim());
+      await api.criarProjeto(entrada.trim(), auto);
       setEntrada("");
-      avisar("Importação iniciada. Acompanhe o progresso abaixo.");
+      avisar(auto
+        ? "Importação iniciada. Os cortes vão aparecer sozinhos no projeto; é só revisar e exportar."
+        : "Importação iniciada. Acompanhe o progresso abaixo.");
       carregar();
     } catch (err) {
       avisar(erroTexto(err), "erro");
@@ -84,6 +91,16 @@ export default function Inicio() {
     try {
       await api.apagarProjeto(p.id);
       carregar();
+    } catch (err) {
+      avisar(erroTexto(err), "erro");
+    }
+  }
+
+  async function exportarTudo(p: Projeto) {
+    if (!confirm(`Exportar os ${p.n_cortes} corte(s) de "${p.nome}" nos formatos de cada um?`)) return;
+    try {
+      const r = await api.exportarProjeto(p.id);
+      avisar(`${r.arquivos} arquivo(s) na fila de exportação.`);
     } catch (err) {
       avisar(erroTexto(err), "erro");
     }
@@ -119,6 +136,10 @@ export default function Inicio() {
             <Download size={15} /> {enviando ? "Enviando…" : "Importar"}
           </button>
         </form>
+        <label className="corte-check auto-cortes" title="Transcreve, acha os momentos virais e já cria os cortes com o seu Padrão dos cortes. Você revisa e exporta.">
+          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+          <Wand2 size={15} /> Criar os cortes automaticamente (você só revisa e exporta)
+        </label>
       </section>
 
       <section>
@@ -163,6 +184,11 @@ export default function Inicio() {
                       <a className="btn btn-primario" href={`#/projeto/${p.id}`}>
                         <Scissors size={15} /> Abrir
                       </a>
+                    )}
+                    {pronto && p.n_cortes > 0 && (
+                      <button className="btn" onClick={() => exportarTudo(p)} title="Exporta todos os cortes deste projeto">
+                        <Upload size={15} /> Exportar todos
+                      </button>
                     )}
                     {p.status === "erro" && (
                       <button className="btn" onClick={() => reprocessar(p)}>

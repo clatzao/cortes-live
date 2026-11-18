@@ -222,7 +222,13 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
   }
 
   async function exportarTodos() {
-    for (const c of cortes) await exportar(c);
+    if (!confirm(`Exportar os ${cortes.length} cortes nos formatos de cada um?`)) return;
+    try {
+      const r = await api.exportarProjeto(id);
+      avisar(`${r.arquivos} arquivo(s) na fila de exportação.`);
+    } catch (e) {
+      avisar(erroTexto(e), "erro");
+    }
   }
 
   async function remover(c: Corte) {
@@ -381,6 +387,10 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
               setCortes((l) => [...l.filter((x) => x.id !== c.id), c].sort((a, b) => a.inicio - b.inicio));
               setCorteAtivo(c.id);
             }}
+            onCortesCriados={(novos) => {
+              const ids = new Set(novos.map((c) => c.id));
+              setCortes((l) => [...l.filter((x) => !ids.has(x.id)), ...novos].sort((a, b) => a.inicio - b.inicio));
+            }}
           />
         )}
 
@@ -405,7 +415,7 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
                 Nenhum corte. Arraste na timeline ou use I/O e Enter. Também dá para colar uma lista de horários.
               </p>
             )}
-            {cortes.length > 1 && (
+            {cortes.length > 0 && (
               <button className="btn" onClick={exportarTodos} title="Coloca todos os cortes na fila de exportação">
                 <Upload size={15} /> Exportar todos ({cortes.length})
               </button>

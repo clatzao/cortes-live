@@ -1695,3 +1695,8 @@ kbd {
 .timeline-cursor { position: absolute; inset: 0; pointer-events: none; display: block; }
 /* lives longas têm milhares de frases: o navegador só desenha as que estão visíveis */
 .texto-transcricao .segmento { content-visibility: auto; contain-intrinsic-size: auto 3.2em; }
+
+/* ---------------------------------------------------------------- fluxo */
+.auto-cortes { margin-top: 10px; gap: 6px; }
+.barra-marcados { display: flex; align-items: center; gap: 8px; padding: 6px 0 8px; border-bottom: 1px solid var(--borda); margin-bottom: 8px; }
+.momento-marca { width: 16px; height: 16px; margin: 0; flex-shrink: 0; }

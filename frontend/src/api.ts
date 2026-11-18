@@ -63,6 +63,9 @@ export interface Ajustes {
   viral_max: number;
   viral_qtd: number;
   viral_auto: boolean;
+  estilo_padrao: string;
+  legenda_padrao: boolean;
+  auto_cortes: boolean;
   opcoes: { whisper_modelo: string[]; whisper_dispositivo: string[] };
 }
 
@@ -275,7 +278,8 @@ export const api = {
 
   projetos: () => req<Projeto[]>("/api/projetos"),
   projeto: (id: number) => req<Projeto>(`/api/projetos/${id}`),
-  criarProjeto: (entrada: string) => req<Projeto>("/api/projetos", "POST", { entrada }),
+  criarProjeto: (entrada: string, auto_cortes = false) => req<Projeto>("/api/projetos", "POST", { entrada, auto_cortes }),
+  exportarProjeto: (id: number) => req<{ cortes: number; arquivos: number }>(`/api/projetos/${id}/exportar`, "POST"),
   reprocessar: (id: number) => req<Projeto>(`/api/projetos/${id}/reprocessar`, "POST"),
   apagarProjeto: (id: number) => req<{ ok: boolean }>(`/api/projetos/${id}`, "DELETE"),
   ondas: (id: number) => req<Ondas>(`/api/projetos/${id}/ondas`),
@@ -292,6 +296,8 @@ export const api = {
     req<Job>(`/api/projetos/${projetoId}/analisar`, "POST", dados),
   sugestoes: (projetoId: number) => req<Sugestao[]>(`/api/projetos/${projetoId}/sugestoes`),
   aceitarSugestao: (id: number) => req<Corte>(`/api/sugestoes/${id}/aceitar`, "POST"),
+  aceitarSugestoes: (projetoId: number, ids: number[]) =>
+    req<Corte[]>(`/api/projetos/${projetoId}/sugestoes/aceitar`, "POST", { ids }),
   descartarSugestao: (id: number) => req<{ ok: boolean }>(`/api/sugestoes/${id}/descartar`, "POST"),
   urlProxy: (id: number) => `/api/projetos/${id}/proxy`,
 

@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
 
-from . import ajustes, config, db, formatos, hardware, jobs, legendas, marca, media, tempo, thumbs, transcricao, viral
+from . import ajustes, config, cortes, db, formatos, hardware, jobs, legendas, marca, media, tempo, thumbs, transcricao, viral
 from . import tarefas  # registra os jobs na fila
 
 app = FastAPI(title="Cortes Live")
@@ -91,6 +91,9 @@ class Ajustes(BaseModel):
     viral_max: int | None = None
     viral_qtd: int | None = None
     viral_auto: bool | None = None
+    estilo_padrao: str | None = None
+    legenda_padrao: bool | None = None
+    auto_cortes: bool | None = None
 
 
 @app.get("/api/ajustes")
@@ -150,6 +153,7 @@ def procurar_arquivo(tipo: str = "video"):
 class NovoProjeto(BaseModel):
     entrada: str = Field(min_length=1)
     nome: str | None = None
+    auto_cortes: bool = False  # transcreve, acha os momentos e já cria os cortes
 
 
 @app.get("/api/projetos")
@@ -166,8 +170,9 @@ def criar_projeto(dados: NovoProjeto):
             raise HTTPException(400, "Arquivo não encontrado. Confira o caminho ou cole um link.")
         entrada = str(Path(entrada).resolve())
     nome = (dados.nome or "").strip() or (entrada if eh_link else Path(entrada).stem)
-    pid = db.executar("INSERT INTO projetos (nome, origem, entrada, criado_em) VALUES (?,?,?,?)",
-                      (nome, "link" if eh_link else "arquivo", entrada, db.agora()))
+    pid = db.executar("INSERT INTO projetos (nome, origem, entrada, auto_cortes, criado_em) VALUES (?,?,?,?,?)",
+                      (nome, "link" if eh_link else "arquivo", entrada, int(dados.auto_cortes), db.agora()))
+    ajustes.salvar({"auto_cortes": dados.auto_cortes})  # a caixinha lembra a última escolha
     jobs.enfileirar("importar", projeto_id=pid)
     return _com_progresso(_projeto(pid))
 
@@ -330,11 +335,6 @@ def _validar_intervalo(p: dict, inicio: float, fim: float) -> tuple[float, float
     return round(inicio, 2), round(fim, 2)
 
 
-def _proximo_nome(projeto_id: int) -> str:
-    n = db.um("SELECT COUNT(*) AS n FROM cortes WHERE projeto_id=?", (projeto_id,))["n"]
-    return f"Corte {n + 1}"
-
-
 @app.get("/api/projetos/{projeto_id}/cortes")
 def listar_cortes(projeto_id: int):
     _projeto(projeto_id)
@@ -346,9 +346,7 @@ def listar_cortes(projeto_id: int):
 def criar_corte(projeto_id: int, dados: NovoCorte):
     p = _projeto(projeto_id)
     inicio, fim = _validar_intervalo(p, dados.inicio, dados.fim)
-    nome = (dados.nome or "").strip() or _proximo_nome(projeto_id)
-    cid = db.executar("INSERT INTO cortes (projeto_id, nome, inicio, fim, criado_em) VALUES (?,?,?,?,?)",
-                      (projeto_id, nome[:120], inicio, fim, db.agora()))
+    cid = cortes.criar(projeto_id, inicio, fim, dados.nome)
     return _corte_completo(_corte(cid))
 
 
@@ -360,9 +358,7 @@ def criar_cortes_em_lote(projeto_id: int, dados: ListaTimestamps):
     cortes, invalidas = tempo.ler_lista(dados.texto, p["duracao"])
     criados = []
     for c in cortes:
-        nome = c["nome"] or _proximo_nome(projeto_id)
-        cid = db.executar("INSERT INTO cortes (projeto_id, nome, inicio, fim, criado_em) VALUES (?,?,?,?,?)",
-                          (projeto_id, nome, c["inicio"], c["fim"], db.agora()))
+        cid = cortes.criar(projeto_id, c["inicio"], c["fim"], c["nome"])
         criados.append(_corte_completo(_corte(cid)))
     return {"criados": criados, "invalidas": invalidas}
 
@@ -558,6 +554,24 @@ def exportar_corte(corte_id: int, dados: PedidoExportacao | None = None):
     return criados
 
 
+@app.post("/api/projetos/{projeto_id}/exportar")
+def exportar_projeto(projeto_id: int):
+    """Todos os cortes do projeto, cada um nos seus formatos."""
+    p = _projeto(projeto_id)
+    if p["status"] != "pronto":
+        raise HTTPException(400, "Aguarde o projeto terminar de processar.")
+    lista = db.listar("SELECT * FROM cortes WHERE projeto_id=? ORDER BY inicio", (projeto_id,))
+    if not lista:
+        raise HTTPException(400, "Este projeto ainda não tem cortes.")
+    n = 0
+    for c in lista:
+        for fmt in tarefas.formatos_do_corte(c, p):
+            jobs.enfileirar("exportar", projeto_id=projeto_id, corte_id=c["id"],
+                            params={"nome": c["nome"], "formato": fmt})
+            n += 1
+    return {"cortes": len(lista), "arquivos": n}
+
+
 # ---------------------------------------------------------------- momentos virais
 
 class PedidoAnalise(BaseModel):
@@ -599,15 +613,25 @@ def _sugestao(sid: int) -> dict:
 def aceitar_sugestao(sugestao_id: int):
     """Transforma a sugestão num corte (com nome e gancho já preenchidos)."""
     s = _sugestao(sugestao_id)
-    if s["status"] == "aceita" and s["corte_id"] and db.um("SELECT id FROM cortes WHERE id=?", (s["corte_id"],)):
-        return _corte_completo(_corte(s["corte_id"]))
-    p = _projeto(s["projeto_id"])
-    inicio, fim = _validar_intervalo(p, s["inicio"], s["fim"])
-    cid = db.executar("INSERT INTO cortes (projeto_id, nome, inicio, fim, gancho, criado_em) VALUES (?,?,?,?,?,?)",
-                      (p["id"], (s["nome"] or _proximo_nome(p["id"]))[:120], inicio, fim, s["gancho"] or None,
-                       db.agora()))
-    db.executar("UPDATE sugestoes SET status='aceita', corte_id=? WHERE id=?", (cid, sugestao_id))
+    cid = cortes.aceitar_sugestao(s, _projeto(s["projeto_id"])["duracao"] or 0)
+    if cid is None:
+        raise HTTPException(400, "O corte precisa ter pelo menos 0,5 segundo.")
     return _corte_completo(_corte(cid))
+
+
+class ListaIds(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=200)
+
+
+@app.post("/api/projetos/{projeto_id}/sugestoes/aceitar")
+def aceitar_varias(projeto_id: int, dados: ListaIds):
+    """Várias sugestões viram cortes de uma vez."""
+    p = _projeto(projeto_id)
+    marcas = ",".join("?" * len(dados.ids))
+    lista = db.listar(f"SELECT * FROM sugestoes WHERE projeto_id=? AND id IN ({marcas}) ORDER BY inicio",
+                      (projeto_id, *dados.ids))
+    criados = [cid for s in lista if (cid := cortes.aceitar_sugestao(s, p["duracao"] or 0))]
+    return [_corte_completo(_corte(cid)) for cid in criados]
 
 
 @app.post("/api/sugestoes/{sugestao_id}/descartar")

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, avisar, erroTexto, Fonte, Formato, Marca } from "../api";
+import { api, avisar, erroTexto, Fonte, Marca } from "../api";
 
 const POSICOES: Record<string, string> = {
   sup_esq: "Canto superior esquerdo",
@@ -13,13 +13,11 @@ type Secao = "logo" | "intro" | "outro" | "musica";
 export default function MarcaPagina() {
   const [m, setM] = useState<Marca | null>(null);
   const [fontes, setFontes] = useState<Fonte[]>([]);
-  const [formatos, setFormatos] = useState<Formato[]>([]);
   const [sujo, setSujo] = useState(false);
 
   useEffect(() => {
     api.marca().then(setM).catch((e) => avisar(erroTexto(e), "erro"));
     api.fontes().then(setFontes).catch(() => {});
-    api.formatos().then(setFormatos).catch(() => {});
   }, []);
 
   function mudar<S extends keyof Marca>(secao: S, valor: Partial<Marca[S]> | Marca[S]) {
@@ -71,13 +69,6 @@ export default function MarcaPagina() {
     </div>
   );
 
-  const padrao = (secao: Secao) => (
-    <label className="corte-check">
-      <input type="checkbox" checked={m[secao].padrao} onChange={(e) => mudar(secao, { padrao: e.target.checked })} />
-      Ligado por padrão nos cortes novos
-    </label>
-  );
-
   const fonteGancho = fontes.find((f) => f.id === m.gancho.fonte);
 
   return (
@@ -89,7 +80,8 @@ export default function MarcaPagina() {
         </button>
       </div>
       <p className="sutil">
-        Vale para todos os projetos. Em cada corte, "Formatos e extras" liga ou desliga cada item.
+        Vale para todos os projetos. O que vem ligado nos cortes novos fica em{" "}
+        <a href="#/ajustes/padrao">Padrão dos cortes</a>; em cada corte, "Formatos e extras" liga ou desliga cada item.
       </p>
 
       <div className="grade-config">
@@ -120,7 +112,6 @@ export default function MarcaPagina() {
             <input type="range" min={0.1} max={1} step={0.05} value={m.logo.opacidade}
               onChange={(e) => mudar("logo", { opacidade: Number(e.target.value) })} />
           </label>
-          {padrao("logo")}
         </section>
 
         <section className="cartao campos">
@@ -195,10 +186,8 @@ export default function MarcaPagina() {
           <h2>Intro e outro</h2>
           <span className="sutil">Vídeo antes do corte</span>
           {arquivo("intro", "Vídeo de intro")}
-          {padrao("intro")}
           <span className="sutil">Vídeo depois do corte</span>
           {arquivo("outro", "Vídeo de outro")}
-          {padrao("outro")}
           <p className="sutil">São ajustados sozinhos ao formato de cada corte (com bordas se a proporção for outra).</p>
         </section>
 
@@ -217,28 +206,7 @@ export default function MarcaPagina() {
               onChange={(e) => mudar("musica", { abaixar_na_fala: e.target.checked })} />
             Abaixar a música quando alguém fala
           </label>
-          {padrao("musica")}
           <p className="sutil">A música repete se for mais curta que o corte e some aos poucos no final.</p>
-        </section>
-
-        <section className="cartao campos">
-          <h2>Formatos padrão</h2>
-          <p className="sutil">Usados em projetos novos (cada projeto e cada corte pode mudar).</p>
-          {formatos.map((f) => (
-            <label key={f.id} className="corte-check">
-              <input
-                type="checkbox"
-                checked={m.formatos_padrao.includes(f.id)}
-                onChange={(e) =>
-                  mudar(
-                    "formatos_padrao",
-                    e.target.checked ? [...m.formatos_padrao, f.id] : m.formatos_padrao.filter((x) => x !== f.id),
-                  )
-                }
-              />
-              {f.nome}
-            </label>
-          ))}
         </section>
       </div>
     </div>
