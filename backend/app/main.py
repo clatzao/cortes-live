@@ -55,6 +55,10 @@ def _com_progresso(p: dict) -> dict:
     m = marca.ler()
     p["formatos_efetivos"] = tarefas.formatos_do_corte({}, p, m)
     p["layout_efetivo"] = tarefas.layout_do_projeto(p, m)
+    p["job_analise"] = _ultimo_job("analisar", p["id"])
+    p["n_cortes"] = db.um("SELECT COUNT(*) AS n FROM cortes WHERE projeto_id=?", (p["id"],))["n"]
+    p["n_sugestoes"] = db.um("SELECT COUNT(*) AS n FROM sugestoes WHERE projeto_id=? AND status='nova'",
+                             (p["id"],))["n"]
     return p
 
 
@@ -199,6 +203,25 @@ def editar_projeto(projeto_id: int, dados: EdicaoProjeto):
     if dados.formatos is not None:  # formatos do projeto valem para todos os cortes dele
         db.executar("UPDATE cortes SET formatos=NULL WHERE projeto_id=?", (projeto_id,))
     return _com_progresso(_projeto(projeto_id))
+
+
+@app.get("/api/projetos/{projeto_id}/capa")
+def capa_projeto(projeto_id: int):
+    """Miniatura do projeto (um quadro do preview), gerada uma vez e guardada."""
+    p = _projeto(projeto_id)
+    pasta = config.PROJETOS / str(projeto_id)
+    capa = pasta / "capa.jpg"
+    proxy = pasta / "proxy.mp4"
+    if not capa.exists():
+        if p["status"] != "pronto" or not proxy.exists():
+            raise HTTPException(404, "Ainda sem capa")
+        instante = min(max(1.0, (p["duracao"] or 0) * 0.1), 120.0)
+        subprocess.run([config.FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{instante:.2f}",
+                        "-i", str(proxy), "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "4", str(capa)],
+                       capture_output=True, creationflags=config.SEM_JANELA)
+        if not capa.exists():
+            raise HTTPException(404, "Não foi possível gerar a capa")
+    return FileResponse(capa, media_type="image/jpeg")
 
 
 @app.get("/api/projetos/{projeto_id}/quadro")

@@ -7,9 +7,11 @@ interface Props {
   estilos: Estilo[];
   onFechar: () => void;
   onAlterado: (c: Corte) => void;
+  onSujo?: (sujo: boolean) => void;
 }
 
-export default function EditorLegenda({ corte, estilos, onFechar, onAlterado }: Props) {
+/** Aba "Legenda" da janela do corte. */
+export default function EditorLegenda({ corte, estilos, onFechar, onAlterado, onSujo }: Props) {
   const [palavras, setPalavras] = useState<PalavraLegenda[] | null>(null);
   const [editada, setEditada] = useState(false);
   const [semTranscricao, setSemTranscricao] = useState(false);
@@ -40,16 +42,10 @@ export default function EditorLegenda({ corte, estilos, onFechar, onAlterado }: 
     return () => clearTimeout(id);
   }, [t]);
 
-  useEffect(() => {
-    const f = (e: KeyboardEvent) => e.key === "Escape" && fechar();
-    window.addEventListener("keydown", f);
-    return () => window.removeEventListener("keydown", f);
-  });
+  // a janela do corte pergunta antes de fechar ou trocar de aba com alterações não salvas
+  useEffect(() => onSujo?.(sujo), [sujo, onSujo]);
 
-  function fechar() {
-    if (sujo && !confirm("Descartar as alterações da legenda?")) return;
-    onFechar();
-  }
+  const fechar = onFechar;
 
   function alterarTexto(i: number, texto: string) {
     setPalavras((l) => l && l.map((w, j) => (j === i ? [w[0], w[1], texto] : w)));
@@ -102,15 +98,7 @@ export default function EditorLegenda({ corte, estilos, onFechar, onAlterado }: 
   const atual = palavras?.findIndex((w, i) => t >= w[0] && (i + 1 >= palavras.length || t < palavras[i + 1][0])) ?? -1;
 
   return (
-    <div className="modal-fundo" onMouseDown={(e) => e.target === e.currentTarget && fechar()}>
-      <div className="modal" role="dialog" aria-label={`Legenda de ${corte.nome}`}>
-        <div className="modal-topo">
-          <h2>Legenda · {corte.nome}</h2>
-          <button className="btn-icone" onClick={fechar} aria-label="Fechar">
-            ✕
-          </button>
-        </div>
-
+    <>
         <div className="modal-corpo legenda-grade">
           <div className="legenda-previa">
             <img
@@ -142,7 +130,7 @@ export default function EditorLegenda({ corte, estilos, onFechar, onAlterado }: 
                   </option>
                 ))}
               </select>
-              <a className="sutil" href="#/legendas" onClick={onFechar}>
+              <a className="sutil" href="#/ajustes/legendas" onClick={onFechar}>
                 Editar estilos
               </a>
             </label>
@@ -193,7 +181,6 @@ export default function EditorLegenda({ corte, estilos, onFechar, onAlterado }: 
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </>
   );
 }

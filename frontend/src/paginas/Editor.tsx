@@ -1,10 +1,21 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft, ArrowLeftToLine, ArrowRightToLine, FileText, Keyboard, ListPlus, Pause, Play, RefreshCw, Scissors,
+  Sparkles, Upload,
+} from "lucide-react";
+
+const ATALHOS: [string[], string][] = [
+  [["Espaço"], "tocar/pausar"],
+  [["I"], "início"],
+  [["O"], "fim"],
+  [["Enter"], "criar corte"],
+  [["Esc"], "limpar seleção"],
+  [["←", "→"], "1 s (Shift 5 s)"],
+  [[",", "."], "0,1 s"],
+];
 import { api, avisar, Corte, erroTexto, Estilo, Formato, Idioma, Job, Marca, Ondas, Projeto } from "../api";
-import EditorLegenda from "../componentes/EditorLegenda";
-import OpcoesCorte from "../componentes/OpcoesCorte";
+import JanelaCorte, { AbaCorte } from "../componentes/JanelaCorte";
 import PainelMomentos from "../componentes/PainelMomentos";
-// o editor de thumb (Konva) só é baixado quando aberto
-const EditorThumb = lazy(() => import("../thumb/EditorThumb"));
 import Timeline from "../componentes/Timeline";
 import CorteItem from "../componentes/CorteItem";
 import PainelTranscricao from "../componentes/PainelTranscricao";
@@ -30,9 +41,7 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
   const [estilos, setEstilos] = useState<Estilo[]>([]);
   const [listaFormatos, setListaFormatos] = useState<Formato[]>([]);
   const [marca, setMarca] = useState<Marca | null>(null);
-  const [opcoesAbertas, setOpcoesAbertas] = useState<number | null>(null);
-  const [thumbAberta, setThumbAberta] = useState<number | null>(null);
-  const [legendaAberta, setLegendaAberta] = useState<number | null>(null);
+  const [janela, setJanela] = useState<{ corteId: number; aba: AbaCorte } | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const fimPrevia = useRef<number | null>(null);
 
@@ -240,8 +249,8 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
     <div className="editor">
       <div className="editor-principal">
         <div className="editor-cabecalho">
-          <a href="#/" className="btn btn-peq">
-            ← Projetos
+          <a href="#/" className="btn btn-peq" title="Voltar para a lista de projetos">
+            <ArrowLeft size={14} /> Projetos
           </a>
           <h1 title={projeto.nome}>{projeto.nome}</h1>
           <span className="sutil">
@@ -260,7 +269,7 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
               className="btn btn-peq"
               onClick={() => confirm("Transcrever a live de novo? A transcrição atual será substituída.") && transcrever()}
             >
-              Transcrever de novo
+              <RefreshCw size={13} /> Transcrever de novo
             </button>
           </div>
         </div>
@@ -277,26 +286,29 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
         </div>
 
         <div className="barra-controles">
-          <button className="btn" onClick={alternarPlay} title="Espaço">
-            {tocando ? "❚❚ Pausar" : "▶ Tocar"}
+          <button className="btn" onClick={alternarPlay} title="Tocar / pausar (Espaço)">
+            {tocando ? <><Pause size={15} /> Pausar</> : <><Play size={15} /> Tocar</>}
           </button>
           <span className="tempo-atual">
             {formatar(tempo)} / {formatar(duracao)}
           </span>
           <div className="separador" />
-          <button className="btn" onClick={() => setSelecao((s) => ({ ...s, inicio: tempo }))} title="Tecla I">
-            [ Início
+          <button className="btn" onClick={() => setSelecao((s) => ({ ...s, inicio: tempo }))}
+            title="Marcar o início do corte aqui (tecla I)">
+            <ArrowRightToLine size={15} /> Início
           </button>
-          <button className="btn" onClick={() => setSelecao((s) => ({ ...s, fim: tempo }))} title="Tecla O">
-            Fim ]
+          <button className="btn" onClick={() => setSelecao((s) => ({ ...s, fim: tempo }))}
+            title="Marcar o fim do corte aqui (tecla O)">
+            Fim <ArrowLeftToLine size={15} />
           </button>
           <span className="sutil">
             {selecao.inicio !== null ? formatar(selecao.inicio) : "--:--:--"} →{" "}
             {selecao.fim !== null ? formatar(selecao.fim) : "--:--:--"}
             {durSel !== null && ` (${duracaoCurta(durSel)})`}
           </span>
-          <button className="btn btn-primario" onClick={criarCorte} disabled={selecao.inicio === null} title="Enter">
-            + Criar corte
+          <button className="btn btn-primario" onClick={criarCorte} disabled={selecao.inicio === null}
+            title={selecao.inicio === null ? "Marque o início (I) ou arraste na timeline" : "Criar corte com a seleção (Enter)"}>
+            <Scissors size={15} /> Criar corte
           </button>
         </div>
 
@@ -316,28 +328,35 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
             if (c) buscar(c.inicio);
           }}
         />
-        <p className="sutil atalhos">
-          Atalhos: Espaço tocar/pausar · I início · O fim · Enter criar corte · Esc limpar · ←/→ 1s (Shift 5s) · , e .
-          0,1s
-        </p>
+        <div className="atalhos" aria-label="Atalhos de teclado">
+          <Keyboard size={14} />
+          {ATALHOS.map(([teclas, acao]) => (
+            <span key={acao} className="atalho">
+              {teclas.map((t) => <kbd key={t}>{t}</kbd>)} {acao}
+            </span>
+          ))}
+        </div>
       </div>
 
       <aside className="editor-lateral">
         <div className="abas">
-          <button className={aba === "momentos" ? "ativo" : ""} onClick={() => setAba("momentos")}>
-            Momentos
+          <button className={aba === "momentos" ? "ativo" : ""} onClick={() => setAba("momentos")}
+            title="Momentos com mais chance de viralizar">
+            <Sparkles size={14} /> Momentos
             {jobAnalise && (jobAnalise.status === "executando" || jobAnalise.status === "na_fila") && " …"}
           </button>
-          <button className={aba === "transcricao" ? "ativo" : ""} onClick={() => setAba("transcricao")}>
-            Transcrição
+          <button className={aba === "transcricao" ? "ativo" : ""} onClick={() => setAba("transcricao")}
+            title="Texto da live: buscar frases e criar cortes pelo texto">
+            <FileText size={14} /> Texto
             {jobTranscricao && (jobTranscricao.status === "executando" || jobTranscricao.status === "na_fila") &&
               ` ${Math.round(jobTranscricao.progresso * 100)}%`}
           </button>
-          <button className={aba === "cortes" ? "ativo" : ""} onClick={() => setAba("cortes")}>
-            Cortes ({cortes.length})
+          <button className={aba === "cortes" ? "ativo" : ""} onClick={() => setAba("cortes")} title="Seus cortes">
+            <Scissors size={14} /> Cortes ({cortes.length})
           </button>
-          <button className={aba === "timestamps" ? "ativo" : ""} onClick={() => setAba("timestamps")}>
-            Colar timestamps
+          <button className={aba === "timestamps" ? "ativo" : ""} onClick={() => setAba("timestamps")}
+            title="Colar uma lista de horários para criar vários cortes">
+            <ListPlus size={14} /> Horários
           </button>
         </div>
 
@@ -377,8 +396,8 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
               </p>
             )}
             {cortes.length > 1 && (
-              <button className="btn" onClick={exportarTodos}>
-                Exportar todos ({cortes.length})
+              <button className="btn" onClick={exportarTodos} title="Coloca todos os cortes na fila de exportação">
+                <Upload size={15} /> Exportar todos ({cortes.length})
               </button>
             )}
             {cortes.map((c) => (
@@ -387,19 +406,11 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
                 corte={c}
                 ativo={c.id === corteAtivo}
                 jobs={jobsDoCorte(c.id)}
-                onOpcoes={() => {
-                  video.current?.pause();
-                  setOpcoesAbertas(c.id);
-                }}
-                onThumb={() => {
-                  video.current?.pause();
-                  setThumbAberta(c.id);
-                }}
                 tempoAtual={tempo}
                 estilos={estilos}
-                onEditarLegenda={() => {
+                onEditar={(abaJanela) => {
                   video.current?.pause();
-                  setLegendaAberta(c.id);
+                  setJanela({ corteId: c.id, aba: abaJanela });
                 }}
                 onSelecionar={() => {
                   setCorteAtivo(c.id);
@@ -414,44 +425,23 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
           </div>
         )}
 
-        {thumbAberta !== null &&
+        {janela &&
           (() => {
-            const c = cortes.find((x) => x.id === thumbAberta);
+            const c = cortes.find((x) => x.id === janela.corteId);
             return c ? (
-              <Suspense fallback={<div className="modal-fundo"><div className="modal painel-pad">Abrindo o editor…</div></div>}>
-                <EditorThumb corte={c} onFechar={() => setThumbAberta(null)} />
-              </Suspense>
-            ) : null;
-          })()}
-
-        {opcoesAbertas !== null &&
-          (() => {
-            const c = cortes.find((x) => x.id === opcoesAbertas);
-            return c ? (
-              <OpcoesCorte
+              <JanelaCorte
                 corte={c}
                 projeto={projeto}
+                estilos={estilos}
                 formatos={listaFormatos}
                 marca={marca}
-                onFechar={() => setOpcoesAbertas(null)}
+                abaInicial={janela.aba}
+                onFechar={() => setJanela(null)}
                 onAlterado={(novo) => setCortes((l) => l.map((x) => (x.id === novo.id ? novo : x)))}
                 onProjeto={(p, formatosMudaram) => {
                   setProjeto(p);
                   if (formatosMudaram) api.cortes(id).then(setCortes).catch(() => {});
                 }}
-              />
-            ) : null;
-          })()}
-
-        {legendaAberta !== null &&
-          (() => {
-            const c = cortes.find((x) => x.id === legendaAberta);
-            return c ? (
-              <EditorLegenda
-                corte={c}
-                estilos={estilos}
-                onFechar={() => setLegendaAberta(null)}
-                onAlterado={(novo) => setCortes((l) => l.map((x) => (x.id === novo.id ? novo : x)))}
               />
             ) : null;
           })()}

@@ -39,7 +39,7 @@ interface Pessoa {
 
 interface Props {
   corte: Corte;
-  onFechar: () => void;
+  onSujo?: (sujo: boolean) => void;
 }
 
 const EMOJIS = ["😱", "🔥", "😂", "💀", "🤯", "👀", "💰", "🏆", "❤️", "⚠️", "✅", "❌", "😡", "😭", "🎮", "👉"];
@@ -67,7 +67,8 @@ function registrarFontes(fontes: Fonte[]): Promise<void> {
   return fontesRegistradas;
 }
 
-export default function EditorThumb({ corte, onFechar }: Props) {
+/** Aba "Thumbnail" da janela do corte. */
+export default function EditorThumb({ corte, onSujo }: Props) {
   const [tamanho, setTamanho] = useState<TamanhoThumb>("youtube");
   const [designs, setDesigns] = useState<Partial<Record<TamanhoThumb, Design>>>({});
   const [historico, setHistorico] = useState<Partial<Record<TamanhoThumb, Design[]>>>({});
@@ -422,10 +423,9 @@ export default function EditorThumb({ corte, onFechar }: Props) {
     setSalvos(lista);
   }
 
-  function fechar() {
-    if (Object.values(sujo).some(Boolean) && !confirm("Há alterações não salvas. Fechar mesmo assim?")) return;
-    onFechar();
-  }
+  // a janela do corte pergunta antes de fechar ou trocar de aba com alterações não salvas
+  const algumSujo = Object.values(sujo).some(Boolean);
+  useEffect(() => onSujo?.(algumSujo), [algumSujo, onSujo]);
 
   // ---------------------------------------------------------------- tela
 
@@ -437,23 +437,18 @@ export default function EditorThumb({ corte, onFechar }: Props) {
     : [{ v: "normal", n: "Normal" }, { v: "bold", n: "Negrito" }];
 
   return (
-    <div className="modal-fundo" onMouseDown={(e) => e.target === e.currentTarget && fechar()}>
-      <div className="modal modal-thumb" role="dialog" aria-label={`Thumbnail de ${corte.nome}`}>
-        <div className="modal-topo">
-          <h2>Thumbnail · {corte.nome}</h2>
-          <div className="acoes">
-            {(Object.keys(TAMANHOS) as TamanhoThumb[]).map((t) => (
-              <button key={t} className={`btn btn-peq ${t === tamanho ? "btn-primario" : ""}`}
-                onClick={() => (setTamanho(t), setSelecionada(null))}>
-                {TAMANHOS[t].nome}
-                {exportadas[t] ? " ✓" : ""}
-                {sujo[t] ? " •" : ""}
-              </button>
-            ))}
-            <button className="btn-icone" onClick={fechar} aria-label="Fechar">
-              ✕
+    <>
+        <div className="barra-tamanhos">
+          <span className="sutil">Tamanho:</span>
+          {(Object.keys(TAMANHOS) as TamanhoThumb[]).map((t) => (
+            <button key={t} className={`btn btn-peq ${t === tamanho ? "btn-primario" : ""}`}
+              onClick={() => (setTamanho(t), setSelecionada(null))}
+              title={exportadas[t] ? "Já exportada" : sujo[t] ? "Alterações não salvas" : undefined}>
+              {TAMANHOS[t].nome}
+              {exportadas[t] ? " ✓" : ""}
+              {sujo[t] ? " •" : ""}
             </button>
-          </div>
+          ))}
         </div>
 
         <div className="modal-corpo thumb-grade">
@@ -685,8 +680,7 @@ export default function EditorThumb({ corte, onFechar }: Props) {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </>
   );
 }
 

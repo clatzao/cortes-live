@@ -1,28 +1,26 @@
 import { useEffect, useState } from "react";
+import { Cpu, ListChecks, Moon, Sun } from "lucide-react";
 import { api, Hardware, Job } from "./api";
 import Inicio from "./paginas/Inicio";
 import Editor from "./paginas/Editor";
 import Fila from "./paginas/Fila";
-import Configuracoes from "./paginas/Configuracoes";
-import Legendas from "./paginas/Legendas";
-import MarcaPagina from "./paginas/MarcaPagina";
+import Ajustes, { AbaAjustes } from "./paginas/Ajustes";
 
 type Rota =
   | { pagina: "inicio" }
   | { pagina: "projeto"; id: number }
   | { pagina: "fila" }
-  | { pagina: "config" }
-  | { pagina: "legendas" }
-  | { pagina: "marca" };
+  | { pagina: "ajustes"; aba: AbaAjustes };
 
 function lerRota(): Rota {
   const h = window.location.hash.replace(/^#\/?/, "");
   const m = h.match(/^projeto\/(\d+)/);
   if (m) return { pagina: "projeto", id: Number(m[1]) };
   if (h.startsWith("fila")) return { pagina: "fila" };
-  if (h.startsWith("config")) return { pagina: "config" };
-  if (h.startsWith("legendas")) return { pagina: "legendas" };
-  if (h.startsWith("marca")) return { pagina: "marca" };
+  // endereços antigos continuam funcionando
+  if (h.startsWith("legendas") || h.startsWith("ajustes/legendas")) return { pagina: "ajustes", aba: "legendas" };
+  if (h.startsWith("marca") || h.startsWith("ajustes/marca")) return { pagina: "ajustes", aba: "marca" };
+  if (h.startsWith("config") || h.startsWith("ajustes")) return { pagina: "ajustes", aba: "sistema" };
   return { pagina: "inicio" };
 }
 
@@ -117,25 +115,26 @@ export default function App() {
           <a href="#/" className={rota.pagina === "inicio" || rota.pagina === "projeto" ? "ativo" : ""}>
             Projetos
           </a>
-          <a href="#/legendas" className={rota.pagina === "legendas" ? "ativo" : ""}>
-            Legendas
-          </a>
-          <a href="#/marca" className={rota.pagina === "marca" ? "ativo" : ""}>
-            Marca
-          </a>
-          <a href="#/fila" className={rota.pagina === "fila" ? "ativo" : ""}>
-            Fila {ativos > 0 && <span className="badge">{ativos}</span>}
-          </a>
-          <a href="#/config" className={rota.pagina === "config" ? "ativo" : ""}>
-            Configurações
+          <a href="#/ajustes/legendas" className={rota.pagina === "ajustes" ? "ativo" : ""}>
+            Ajustes
           </a>
         </nav>
         <div className="topo-dir">
-          <a className="chip" href="#/config" title="Hardware detectado">
-            {hw ? `${hw.whisper.dispositivo === "cuda" ? "GPU" : "CPU"} · ${hw.encoder_nome}` : "Detectando hardware…"}
+          <a className="chip" href="#/ajustes/sistema" title="Hardware detectado (clique para ver detalhes)">
+            <Cpu size={13} />
+            {hw ? `${hw.whisper.dispositivo === "cuda" ? "GPU" : "CPU"} · ${hw.encoder_nome}` : "Detectando…"}
+          </a>
+          <a
+            className={`btn-icone botao-fila ${rota.pagina === "fila" ? "ativo" : ""}`}
+            href="#/fila"
+            title={ativos ? `Fila: ${ativos} tarefa(s) em andamento` : "Fila de processamento"}
+            aria-label="Fila de processamento"
+          >
+            <ListChecks size={18} />
+            {ativos > 0 && <span className="badge badge-flutuante">{ativos}</span>}
           </a>
           <button className="btn-icone" onClick={trocarTema} title="Trocar tema claro/escuro" aria-label="Trocar tema">
-            {tema === "dark" ? "☀" : "☾"}
+            {tema === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
       </header>
@@ -144,9 +143,7 @@ export default function App() {
         {rota.pagina === "inicio" && <Inicio />}
         {rota.pagina === "projeto" && <Editor key={rota.id} id={rota.id} fila={fila} />}
         {rota.pagina === "fila" && <Fila fila={fila} />}
-        {rota.pagina === "config" && <Configuracoes hw={hw} onHw={setHw} />}
-        {rota.pagina === "legendas" && <Legendas />}
-        {rota.pagina === "marca" && <MarcaPagina />}
+        {rota.pagina === "ajustes" && <Ajustes aba={rota.aba} hw={hw} onHw={setHw} />}
       </main>
 
       <div className="avisos" role="status">

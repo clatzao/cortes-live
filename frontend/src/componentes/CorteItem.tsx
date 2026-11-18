@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
+import {
+  Captions, ChevronDown, ChevronRight, Crosshair, FolderOpen, Loader2, Pencil, Play, Smartphone, Trash2, Type, Upload,
+} from "lucide-react";
 import { api, avisar, Corte, erroTexto, Estilo, formatoDoJob, Job, NOME_CURTO_FORMATO } from "../api";
 import { duracaoCurta, formatar, ler } from "../tempo";
+import type { AbaCorte } from "./JanelaCorte";
 
 interface Props {
   corte: Corte;
@@ -9,9 +13,8 @@ interface Props {
   jobs: Job[];
   tempoAtual: number;
   estilos: Estilo[];
-  onEditarLegenda: () => void;
-  onOpcoes: () => void;
-  onThumb: () => void;
+  /** abre a janela do corte (legenda, formatos e thumbnail) */
+  onEditar: (aba: AbaCorte) => void;
   onSelecionar: () => void;
   onAlterado: (c: Corte) => void;
   onPrevia: () => void;
@@ -24,6 +27,7 @@ export default function CorteItem(p: Props) {
   const [nome, setNome] = useState(corte.nome);
   const [ini, setIni] = useState(formatar(corte.inicio));
   const [fim, setFim] = useState(formatar(corte.fim));
+  const [aberto, setAberto] = useState(false);
 
   useEffect(() => setNome(corte.nome), [corte.nome]);
   useEffect(() => setIni(formatar(corte.inicio)), [corte.inicio]);
@@ -65,103 +69,88 @@ export default function CorteItem(p: Props) {
   const concluido = p.jobs.find((j) => j.status === "concluido");
   const progresso = ativos.length ? ativos.reduce((s, j) => s + j.progresso, 0) / ativos.length : 0;
 
+  const estiloNome = p.estilos.find((e) => e.id === corte.estilo)?.nome ?? corte.estilo;
+  const parar = (e: React.SyntheticEvent) => e.stopPropagation();
+
   return (
     <div className={`corte ${p.ativo ? "corte-ativo" : ""}`} onClick={p.onSelecionar}>
       <div className="corte-topo">
+        <button className="btn-mini" onClick={(e) => (parar(e), setAberto((a) => !a))}
+          title={aberto ? "Recolher" : "Ajustar início e fim"} aria-label={aberto ? "Recolher" : "Expandir"}
+          aria-expanded={aberto}>
+          {aberto ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </button>
         <input
           className="corte-nome"
           value={nome}
           onChange={(e) => setNome(e.target.value)}
           onBlur={() => nome.trim() && nome !== corte.nome && salvar({ nome })}
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-          onClick={(e) => e.stopPropagation()}
+          onClick={parar}
           aria-label="Nome do corte"
+          title="Clique para renomear"
         />
-        <span className="sutil">{duracaoCurta(corte.fim - corte.inicio)}</span>
+        <span className="corte-duracao">{duracaoCurta(corte.fim - corte.inicio)}</span>
       </div>
 
-      {(["inicio", "fim"] as const).map((campo) => (
-        <div className="corte-tempo" key={campo} onClick={(e) => e.stopPropagation()}>
-          <span className="corte-rotulo">{campo === "inicio" ? "Início" : "Fim"}</span>
-          <button className="btn btn-peq" onClick={() => ajustar(campo, -0.1)} title="-0,1 s">
-            −
-          </button>
-          <input
-            value={campo === "inicio" ? ini : fim}
-            onChange={(e) => (campo === "inicio" ? setIni : setFim)(e.target.value)}
-            onBlur={(e) => confirmarTempo(campo, e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-            aria-label={campo === "inicio" ? "Início do corte" : "Fim do corte"}
-          />
-          <button className="btn btn-peq" onClick={() => ajustar(campo, 0.1)} title="+0,1 s">
-            +
-          </button>
-          <button
-            className="btn btn-peq"
-            onClick={() => salvar({ [campo]: Math.round(p.tempoAtual * 100) / 100 })}
-            title="Usar a posição atual do vídeo"
-          >
-            ⌖ Atual
-          </button>
-        </div>
-      ))}
+      <div className="corte-resumo">
+        <span className="mono">{formatar(corte.inicio, false)} → {formatar(corte.fim, false)}</span>
+        <span title={corte.com_legenda ? `Legenda: ${estiloNome}` : "Sem legenda"}>
+          <Captions size={13} /> {corte.com_legenda ? estiloNome : "sem legenda"}
+        </span>
+        <span title="Formatos que serão exportados">
+          <Smartphone size={13} /> {corte.formatos_efetivos.map((f) => NOME_CURTO_FORMATO[f] ?? f).join(", ")}
+        </span>
+        {corte.gancho && <span title={`Gancho: ${corte.gancho}`}><Type size={13} /> gancho</span>}
+      </div>
 
-      <div className="corte-legenda" onClick={(e) => e.stopPropagation()}>
-        <label className="corte-check">
-          <input
-            type="checkbox"
-            checked={!!corte.com_legenda}
-            onChange={(e) => salvar({ com_legenda: e.target.checked })}
-          />
-          Legenda
-        </label>
-        <select
-          value={corte.estilo}
-          disabled={!corte.com_legenda}
-          onChange={(e) => salvar({ estilo: e.target.value })}
-          aria-label="Estilo da legenda"
-        >
-          {p.estilos.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nome}
-            </option>
+      {aberto && (
+        <div className="corte-ajustes" onClick={parar}>
+          {(["inicio", "fim"] as const).map((campo) => (
+            <div className="corte-tempo" key={campo}>
+              <span className="corte-rotulo">{campo === "inicio" ? "Início" : "Fim"}</span>
+              <button className="btn btn-peq" onClick={() => ajustar(campo, -0.1)} title="Voltar 0,1 s">−</button>
+              <input
+                value={campo === "inicio" ? ini : fim}
+                onChange={(e) => (campo === "inicio" ? setIni : setFim)(e.target.value)}
+                onBlur={(e) => confirmarTempo(campo, e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                aria-label={campo === "inicio" ? "Início do corte" : "Fim do corte"}
+              />
+              <button className="btn btn-peq" onClick={() => ajustar(campo, 0.1)} title="Avançar 0,1 s">+</button>
+              <button className="btn btn-peq" onClick={() => salvar({ [campo]: Math.round(p.tempoAtual * 100) / 100 })}
+                title="Usar a posição atual do vídeo">
+                <Crosshair size={13} /> Atual
+              </button>
+            </div>
           ))}
-        </select>
-        <button className="btn btn-peq" onClick={p.onEditarLegenda} disabled={!corte.com_legenda}>
-          ✎ Editar legenda{corte.legenda ? " •" : ""}
-        </button>
-      </div>
+          <label className="corte-check" title="Liga ou desliga a legenda neste corte">
+            <input type="checkbox" checked={!!corte.com_legenda} onChange={(e) => salvar({ com_legenda: e.target.checked })} />
+            Legenda no vídeo
+          </label>
+        </div>
+      )}
 
-      <div className="corte-formatos" onClick={(e) => e.stopPropagation()}>
-        {corte.formatos_efetivos.map((f) => (
-          <span key={f} className="chip-formato">
-            {NOME_CURTO_FORMATO[f] ?? f}
-          </span>
-        ))}
-        {corte.gancho && <span className="chip-formato" title={corte.gancho}>gancho</span>}
-        <button className="btn btn-peq" onClick={p.onOpcoes}>
-          ⚙ Formatos e extras
+      <div className="corte-acoes" onClick={parar}>
+        <button className="btn-icone" onClick={p.onPrevia} title="Assistir este corte" aria-label="Assistir">
+          <Play size={16} />
         </button>
-        <button className="btn btn-peq" onClick={p.onThumb}>
-          🖼 Thumbnail
+        <button className="btn btn-peq" onClick={() => p.onEditar("legenda")}
+          title="Legenda, formatos, gancho, extras e thumbnail">
+          <Pencil size={14} /> Editar
         </button>
-      </div>
-
-      <div className="acoes" onClick={(e) => e.stopPropagation()}>
-        <button className="btn btn-peq" onClick={p.onPrevia}>
-          ▶ Prévia
-        </button>
-        <button className="btn btn-peq btn-primario" onClick={p.onExportar} disabled={ativos.length > 0}>
-          {ativos.length > 0
-            ? `Exportando ${ativos.length} · ${Math.round(progresso * 100)}%`
-            : `Exportar${corte.formatos_efetivos.length > 1 ? ` (${corte.formatos_efetivos.length})` : ""}`}
+        <button className="btn btn-peq btn-primario" onClick={p.onExportar} disabled={ativos.length > 0}
+          title="Exportar nos formatos marcados">
+          {ativos.length > 0 ? (
+            <><Loader2 size={14} className="girando" /> {Math.round(progresso * 100)}%</>
+          ) : (
+            <><Upload size={14} /> Exportar{corte.formatos_efetivos.length > 1 ? ` (${corte.formatos_efetivos.length})` : ""}</>
+          )}
         </button>
         {concluido && (
-          <button
-            className="btn btn-peq"
-            onClick={() => api.abrirSaida(concluido.id).catch((e) => avisar(erroTexto(e), "erro"))}
-          >
-            ✓ Abrir pasta
+          <button className="btn-icone" title="Mostrar o arquivo exportado na pasta" aria-label="Abrir pasta"
+            onClick={() => api.abrirSaida(concluido.id).catch((e) => avisar(erroTexto(e), "erro"))}>
+            <FolderOpen size={16} />
           </button>
         )}
         {falhas.length > 0 && (
@@ -169,8 +158,8 @@ export default function CorteItem(p: Props) {
             Falhou ({falhas.length})
           </span>
         )}
-        <button className="btn btn-peq btn-perigo" onClick={p.onRemover}>
-          Excluir
+        <button className="btn-icone btn-perigo empurrar-direita" onClick={p.onRemover} title="Excluir corte" aria-label="Excluir corte">
+          <Trash2 size={15} />
         </button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Play, Scissors, Sparkles, X } from "lucide-react";
 import { api, avisar, Corte, erroTexto, Job, Sugestao } from "../api";
 import { duracaoCurta, formatar } from "../tempo";
 
@@ -98,7 +99,9 @@ export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek,
             <input type="number" min={1} max={50} value={qtd} onChange={(e) => setQtd(Number(e.target.value) || 1)} />
           </label>
         </div>
-        <button className="btn btn-primario" onClick={analisar} disabled={!temTranscricao || ativo || enviando}>
+        <button className="btn btn-primario" onClick={analisar} disabled={!temTranscricao || ativo || enviando}
+          title="A IA lê a live e sugere os trechos com mais chance de viralizar">
+          <Sparkles size={15} />
           {ativo ? "Analisando…" : lista && lista.length ? "Analisar de novo" : "Encontrar momentos virais"}
         </button>
         {!temTranscricao && <p className="sutil">A análise usa a transcrição. Aguarde ela terminar.</p>}
@@ -135,18 +138,20 @@ export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek,
             {s.motivo && <p className="momento-motivo">{s.motivo}</p>}
             {s.gancho && <p className="momento-gancho">“{s.gancho}”</p>}
             <div className="acoes">
-              <button className="btn btn-peq" onClick={() => onPrevia(s.inicio, s.fim)}>
-                ▶ Assistir
+              <button className="btn btn-peq" onClick={() => onPrevia(s.inicio, s.fim)} title="Assistir este trecho">
+                <Play size={13} /> Assistir
               </button>
               {s.status === "aceita" ? (
                 <span className="status status-concluido">✓ Virou corte</span>
               ) : (
                 <>
-                  <button className="btn btn-peq btn-primario" onClick={() => aceitar(s)}>
-                    Virar corte
+                  <button className="btn btn-peq btn-primario" onClick={() => aceitar(s)}
+                    title="Cria um corte com este trecho, nome e gancho">
+                    <Scissors size={13} /> Virar corte
                   </button>
-                  <button className="btn btn-peq btn-perigo" onClick={() => descartar(s)}>
-                    Descartar
+                  <button className="btn-icone btn-perigo empurrar-direita" onClick={() => descartar(s)}
+                    title="Descartar sugestão" aria-label="Descartar sugestão">
+                    <X size={15} />
                   </button>
                 </>
               )}

@@ -770,6 +770,14 @@ mark {
 .modal-corpo {
   padding: 16px;
   overflow: auto;
+  /* só o conteúdo rola; o topo (título e abas) e o rodapé (botões) ficam sempre visíveis */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.modal-topo,
+.modal-rodape,
+.barra-tamanhos {
+  flex-shrink: 0;
 }
 .legenda-grade {
   display: grid;
@@ -1306,6 +1314,330 @@ mark {
   }
   .modal-thumb {
     height: auto;
+  }
+}
+
+/* ---------- Organização e ícones (melhorias de uso) ---------- */
+.btn svg,
+.btn-icone svg,
+.chip svg,
+.abas button svg {
+  flex-shrink: 0;
+}
+.abas button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  padding: 10px 4px;
+  font-size: 13px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-icone {
+  text-decoration: none;
+}
+.btn-icone.btn-perigo {
+  color: var(--perigo);
+}
+.btn-icone.ativo {
+  border-color: var(--destaque);
+  color: var(--destaque);
+}
+.botao-fila {
+  position: relative;
+}
+.badge-flutuante {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  margin: 0;
+}
+.empurrar-direita {
+  margin-left: auto;
+}
+.girando {
+  animation: girar 1s linear infinite;
+}
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.mono {
+  font-family: ui-monospace, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ajustes */
+.ajustes {
+  max-width: 1500px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* dentro de um flex em coluna, margin:auto encolhia a página até o conteúdo */
+.ajustes > .pagina {
+  width: 100%;
+}
+.abas-ajustes {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--borda);
+  flex-wrap: wrap;
+}
+.abas-ajustes a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  text-decoration: none;
+  color: var(--texto-sutil);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.abas-ajustes a:hover {
+  color: var(--texto);
+}
+.abas-ajustes a.ativo {
+  color: var(--texto);
+  border-bottom-color: var(--destaque);
+  font-weight: 600;
+}
+
+/* Cards de projeto */
+.projeto {
+  padding: 0;
+  overflow: hidden;
+  gap: 0;
+}
+.capa {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  background: var(--superficie-2);
+  color: var(--texto-sutil);
+  overflow: hidden;
+}
+.capa img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s;
+}
+a.capa:not(.capa-inativa):hover img {
+  transform: scale(1.04);
+}
+.capa-duracao {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 5px;
+}
+.projeto-corpo {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.etapas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.etapa {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--borda);
+  color: var(--texto-sutil);
+}
+.etapa-ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--borda));
+}
+.etapa-andando {
+  color: var(--destaque);
+  border-color: color-mix(in srgb, var(--destaque) 40%, var(--borda));
+}
+.etapa-erro {
+  color: var(--perigo);
+  border-color: color-mix(in srgb, var(--perigo) 40%, var(--borda));
+}
+.vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--texto-sutil);
+  padding: 28px;
+}
+.vazio strong {
+  color: var(--texto);
+}
+.vazio ol {
+  text-align: left;
+  margin: 4px 0 0;
+}
+
+/* Cartão do corte compacto */
+.corte {
+  gap: 6px;
+  padding: 8px 10px;
+}
+.corte-topo {
+  gap: 4px;
+}
+.corte-nome {
+  padding: 3px 6px;
+}
+.corte-duracao {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto-sutil);
+  white-space: nowrap;
+}
+.btn-mini {
+  border: none;
+  background: none;
+  color: var(--texto-sutil);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  border-radius: 4px;
+}
+.btn-mini:hover {
+  color: var(--texto);
+  background: var(--superficie-2);
+}
+.corte-resumo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--texto-sutil);
+  padding-left: 24px;
+}
+.corte-resumo span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.corte-ajustes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0 4px 24px;
+  border-top: 1px dashed var(--borda);
+}
+.corte-acoes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 24px;
+}
+.corte-acoes .btn-icone {
+  width: 30px;
+  height: 30px;
+}
+
+/* Janela do corte */
+.janela-titulo {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.janela-titulo h2 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+.abas-janela {
+  display: flex;
+  gap: 4px;
+  margin: 0 auto;
+  background: var(--superficie-2);
+  padding: 3px;
+  border-radius: 9px;
+}
+.abas-janela button {
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  color: var(--texto-sutil);
+  padding: 6px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.abas-janela button.ativo {
+  background: var(--superficie);
+  color: var(--texto);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.barra-tamanhos {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px 0;
+  flex-wrap: wrap;
+}
+
+/* Atalhos visíveis */
+.atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--texto-sutil);
+}
+.atalho {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+kbd {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 6px;
+  border: 1px solid var(--borda);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--superficie);
+  color: var(--texto);
+}
+
+@media (max-width: 900px) {
+  .abas-janela {
+    margin: 0;
+    order: 3;
+    width: 100%;
+  }
+  .modal-topo {
+    flex-wrap: wrap;
   }
 }
 

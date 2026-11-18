@@ -11,6 +11,7 @@ interface Props {
   onFechar: () => void;
   onAlterado: (c: Corte) => void;
   onProjeto: (p: Projeto, formatosMudaram: boolean) => void;
+  onSujo?: (sujo: boolean) => void;
 }
 
 const RECURSOS: { k: keyof Recursos; nome: string }[] = [
@@ -22,7 +23,8 @@ const RECURSOS: { k: keyof Recursos; nome: string }[] = [
 
 const RECORTE: Record<string, number> = { vertical_crop: 9 / 16, quadrado: 1 };
 
-export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar, onAlterado, onProjeto }: Props) {
+/** Aba "Formatos e extras" da janela do corte. */
+export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar, onAlterado, onProjeto, onSujo }: Props) {
   const [sel, setSel] = useState<string[]>(corte.formatos_efetivos);
   const [cropX, setCropX] = useState(corte.crop_x ?? 0.5);
   const [gancho, setGancho] = useState(corte.gancho ?? "");
@@ -105,24 +107,15 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
     }
   }
 
-  function fechar() {
-    if (sujo && !confirm("Descartar as alterações?")) return;
-    onFechar();
-  }
+  // a janela do corte pergunta antes de fechar ou trocar de aba com alterações não salvas
+  useEffect(() => onSujo?.(sujo), [sujo, onSujo]);
+  const fechar = onFechar;
 
   const frac = larguraRecorte();
   const esquerda = Math.min(1 - frac, Math.max(0, cropX - frac / 2));
 
   return (
-    <div className="modal-fundo" onMouseDown={(e) => e.target === e.currentTarget && fechar()}>
-      <div className="modal" role="dialog" aria-label={`Formatos e extras de ${corte.nome}`}>
-        <div className="modal-topo">
-          <h2>Formatos e extras · {corte.nome}</h2>
-          <button className="btn-icone" onClick={fechar} aria-label="Fechar">
-            ✕
-          </button>
-        </div>
-
+    <>
         <div className="modal-corpo opcoes-grade">
           <div className="opcoes-lado">
             <h3>Formatos para exportar</h3>
@@ -193,7 +186,7 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
                 );
               })}
             </div>
-            <a className="sutil" href="#/marca" onClick={onFechar}>
+            <a className="sutil" href="#/ajustes/marca" onClick={onFechar}>
               Configurar logo, intro, outro e música
             </a>
           </div>
@@ -223,14 +216,14 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
           <span className="sutil">{sel.length} formato(s) marcado(s)</span>
           <div className="acoes">
             <button className="btn" onClick={fechar}>
-              Cancelar
+              Fechar
             </button>
-            <button className="btn btn-primario" onClick={() => salvar()}>
+            <button className="btn btn-primario" disabled={!sujo}
+              onClick={() => salvar(false).then((ok) => ok && avisar("Formatos e extras salvos."))}>
               Salvar
             </button>
           </div>
         </div>
-      </div>
 
       {layoutAberto && (
         <LayoutFacecam
@@ -244,6 +237,6 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
           }}
         />
       )}
-    </div>
+    </>
   );
 }

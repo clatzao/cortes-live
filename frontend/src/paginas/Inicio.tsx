@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Check, Download, Film, FolderOpen, Loader2, RotateCcw, Scissors, Sparkles, Trash2, X } from "lucide-react";
 import { api, avisar, erroTexto, Projeto } from "../api";
 import Progresso from "../componentes/Progresso";
 import { duracaoCurta } from "../tempo";
@@ -9,6 +10,35 @@ const ROTULO_STATUS: Record<Projeto["status"], string> = {
   pronto: "Pronto",
   erro: "Erro",
 };
+
+/** Andamento do projeto: transcrição → momentos → cortes. */
+function Etapas({ p }: { p: Projeto }) {
+  const estado = (j: Projeto["job"]) =>
+    !j ? "pendente" : j.status === "concluido" ? "ok" : j.status === "erro" ? "erro"
+      : j.status === "cancelado" ? "pendente" : "andando";
+  // o histórico da fila pode ter sido limpo: o que existe no disco também conta como feito
+  const trJob = estado(p.job_transcricao);
+  const tr = trJob === "andando" || trJob === "erro" ? trJob : p.tem_transcricao ? "ok" : trJob;
+  const anJob = estado(p.job_analise);
+  const an = anJob === "andando" || anJob === "erro" ? anJob : p.n_sugestoes > 0 ? "ok" : anJob;
+  const icone = (s: string) =>
+    s === "ok" ? <Check size={13} /> : s === "erro" ? <X size={13} /> : s === "andando" ? <Loader2 size={13} className="girando" /> : null;
+  const pct = (j: Projeto["job"]) => (j && (j.status === "executando") ? ` ${Math.round(j.progresso * 100)}%` : "");
+  return (
+    <div className="etapas">
+      <span className={`etapa etapa-${tr}`} title={p.job_transcricao?.mensagem ?? "Transcrição"}>
+        {icone(tr)} Transcrição{pct(p.job_transcricao)}
+      </span>
+      <span className={`etapa etapa-${an}`} title={p.job_analise?.mensagem ?? "Momentos virais"}>
+        {an === "ok" ? <Sparkles size={13} /> : icone(an)}{" "}
+        {an === "ok" && p.n_sugestoes ? `${p.n_sugestoes} momento(s)` : `Momentos${pct(p.job_analise)}`}
+      </span>
+      <span className={`etapa ${p.n_cortes ? "etapa-ok" : "etapa-pendente"}`}>
+        <Scissors size={13} /> {p.n_cortes} corte(s)
+      </span>
+    </div>
+  );
+}
 
 export default function Inicio() {
   const [projetos, setProjetos] = useState<Projeto[] | null>(null);
@@ -82,11 +112,11 @@ export default function Inicio() {
             placeholder="https://www.twitch.tv/videos/…  ou  C:\Lives\live.mkv"
             aria-label="Link ou caminho do arquivo"
           />
-          <button type="button" className="btn" onClick={procurar}>
-            Procurar arquivo…
+          <button type="button" className="btn" onClick={procurar} title="Abre a janela do Windows para escolher o vídeo">
+            <FolderOpen size={15} /> Procurar arquivo…
           </button>
           <button type="submit" className="btn btn-primario" disabled={enviando || !entrada.trim()}>
-            {enviando ? "Enviando…" : "Importar"}
+            <Download size={15} /> {enviando ? "Enviando…" : "Importar"}
           </button>
         </form>
       </section>
@@ -94,53 +124,60 @@ export default function Inicio() {
       <section>
         <h2>Projetos</h2>
         {projetos === null && <p className="sutil">Carregando…</p>}
-        {projetos?.length === 0 && <p className="sutil">Nenhum projeto ainda. Importe sua primeira live acima.</p>}
+        {projetos?.length === 0 && (
+          <div className="cartao vazio">
+            <Film size={32} />
+            <strong>Nenhum projeto ainda</strong>
+            <ol>
+              <li>Importe uma live acima (arquivo do PC ou link).</li>
+              <li>A transcrição e os momentos virais saem sozinhos.</li>
+              <li>Abra o projeto, ajuste os cortes e exporte.</li>
+            </ol>
+          </div>
+        )}
         <div className="grade-projetos">
-          {projetos?.map((p) => (
-            <article key={p.id} className="cartao projeto">
-              <div className="projeto-topo">
-                <h3 title={p.nome}>{p.nome}</h3>
-                <span className={`status status-${p.status}`}>{ROTULO_STATUS[p.status]}</span>
-              </div>
-              <div className="sutil projeto-info">
-                {p.origem === "link" ? "Link" : "Arquivo"}
-                {p.duracao ? ` · ${duracaoCurta(p.duracao)}` : ""}
-                {p.altura ? ` · ${p.altura}p${p.fps ? Math.round(p.fps) : ""}` : ""}
-              </div>
-              {(p.status === "processando" || p.status === "na_fila") && p.job && (
-                <Progresso valor={p.job.progresso} texto={p.job.mensagem} />
-              )}
-              {p.status === "erro" && <pre className="erro-texto">{p.erro}</pre>}
-              {p.status === "pronto" && p.job_transcricao && (
-                <div className="sutil projeto-info">
-                  {p.job_transcricao.status === "executando" || p.job_transcricao.status === "na_fila" ? (
-                    <Progresso valor={p.job_transcricao.progresso} texto={p.job_transcricao.mensagem ?? "Transcrição na fila"} />
-                  ) : p.job_transcricao.status === "concluido" ? (
-                    "✓ Transcrito"
-                  ) : p.job_transcricao.status === "erro" ? (
-                    <span className="status-erro">Transcrição falhou — abra o editor para tentar de novo</span>
-                  ) : (
-                    "Transcrição cancelada"
-                  )}
+          {projetos?.map((p) => {
+            const pronto = p.status === "pronto";
+            const andamento = (p.status === "processando" || p.status === "na_fila") && p.job;
+            return (
+              <article key={p.id} className="cartao projeto">
+                <a className={`capa ${pronto ? "" : "capa-inativa"}`} href={pronto ? `#/projeto/${p.id}` : undefined}
+                  title={pronto ? "Abrir o editor" : undefined}>
+                  {pronto ? <img src={`/api/projetos/${p.id}/capa`} alt="" loading="lazy" /> : <Film size={36} />}
+                  {p.duracao ? <span className="capa-duracao">{duracaoCurta(p.duracao)}</span> : null}
+                </a>
+                <div className="projeto-corpo">
+                  <div className="projeto-topo">
+                    <h3 title={p.nome}>{p.nome}</h3>
+                    {p.status !== "pronto" && <span className={`status status-${p.status}`}>{ROTULO_STATUS[p.status]}</span>}
+                  </div>
+                  <div className="sutil projeto-info">
+                    {p.origem === "link" ? "Link" : "Arquivo"}
+                    {p.altura ? ` · ${p.altura}p${p.fps ? Math.round(p.fps) : ""}` : ""}
+                  </div>
+                  {andamento && <Progresso valor={p.job!.progresso} texto={p.job!.mensagem} />}
+                  {p.status === "erro" && <pre className="erro-texto">{p.erro}</pre>}
+                  {pronto && <Etapas p={p} />}
+                  <div className="acoes">
+                    {pronto && (
+                      <a className="btn btn-primario" href={`#/projeto/${p.id}`}>
+                        <Scissors size={15} /> Abrir
+                      </a>
+                    )}
+                    {p.status === "erro" && (
+                      <button className="btn" onClick={() => reprocessar(p)}>
+                        <RotateCcw size={15} /> Tentar de novo
+                      </button>
+                    )}
+                    <button className="btn-icone btn-perigo empurrar-direita" onClick={() => apagar(p)}
+                      title="Excluir projeto" aria-label="Excluir projeto">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
-              )}
-              <div className="acoes">
-                {p.status === "pronto" && (
-                  <a className="btn btn-primario" href={`#/projeto/${p.id}`}>
-                    Abrir editor
-                  </a>
-                )}
-                {p.status === "erro" && (
-                  <button className="btn" onClick={() => reprocessar(p)}>
-                    Tentar de novo
-                  </button>
-                )}
-                <button className="btn btn-perigo" onClick={() => apagar(p)}>
-                  Excluir
-                </button>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       </section>
     </div>

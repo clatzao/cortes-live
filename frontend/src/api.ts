@@ -26,6 +26,9 @@ export interface Projeto {
   tem_transcricao: boolean;
   formatos_efetivos: string[];
   layout_efetivo: Layout;
+  job_analise: JobResumo | null;
+  n_cortes: number;
+  n_sugestoes: number;
 }
 
 export type Idioma = "pt" | "en" | "misto";
