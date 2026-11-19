@@ -13,6 +13,7 @@ import math
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -152,6 +153,15 @@ def consultar(url: str) -> dict | None:
     return info
 
 
+def _cmd_streamlink(url: str) -> list[str]:
+    """Comando do streamlink para a Twitch, na qualidade escolhida em Ajustes (sem passar do limite)."""
+    cmd = [sys.executable, "-m", "streamlink", "--stdout", "--loglevel", "warning"]
+    qualidade = ajustes.ler()["download_qualidade"]
+    if qualidade != "melhor":
+        cmd += ["--stream-sorting-excludes", f">{qualidade}p"]
+    return cmd + [url, "best"]
+
+
 def _gravar_parte(live_id: int, info: dict, ctx: Contexto) -> None:
     """Grava uma parte até a transmissão cair ou até pedirem para parar."""
     live = obter(live_id)
@@ -168,15 +178,24 @@ def _gravar_parte(live_id: int, info: dict, ctx: Contexto) -> None:
     if titulo:
         _atualizar(live_id, titulo=str(titulo)[:200])
 
-    cabecalhos = "".join(f"{k}: {v}\r\n" for k, v in (info.get("http_headers") or {}).items())
-    cmd = [config.FFMPEG, "-hide_banner", "-loglevel", "error"]
-    if cabecalhos:
-        cmd += ["-headers", cabecalhos]
-    cmd += ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
-            "-i", info["url"], "-map", "0:v:0?", "-map", "0:a:0?", "-c", "copy", "-f", "mpegts",
-            "-progress", "pipe:1", "-nostats", "-y", str(arquivo)]
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            creationflags=config.SEM_JANELA)
+    fonte: subprocess.Popen | None = None  # streamlink (só Twitch), que entrega o vídeo ao FFmpeg pelo pipe
+    if live["plataforma"] == "twitch":
+        # O streamlink descarta os anúncios que a Twitch mistura na live (sem login, a Twitch troca o conteúdo pela
+        # tela de intervalo comercial); o yt-dlp gravaria esses trechos.
+        fonte = subprocess.Popen(_cmd_streamlink(live["url"]), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, creationflags=config.SEM_JANELA)
+        entrada = ["-f", "mpegts", "-i", "pipe:0"]
+    else:
+        cabecalhos = "".join(f"{k}: {v}\r\n" for k, v in (info.get("http_headers") or {}).items())
+        entrada = (["-headers", cabecalhos] if cabecalhos else []) + [
+            "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10", "-i", info["url"]]
+    cmd = [config.FFMPEG, "-hide_banner", "-loglevel", "error", *entrada,
+           "-map", "0:v:0?", "-map", "0:a:0?", "-c", "copy", "-f", "mpegts",
+           "-progress", "pipe:1", "-nostats", "-y", str(arquivo)]
+    proc = subprocess.Popen(cmd, stdin=fonte.stdout if fonte else subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, creationflags=config.SEM_JANELA)
+    if fonte:
+        fonte.stdout.close()  # o FFmpeg é o único leitor: se ele fechar, o streamlink para sozinho
     estado = {"dur": 0.0}
     erros: list[str] = []
 
@@ -191,8 +210,17 @@ def _gravar_parte(live_id: int, info: dict, ctx: Contexto) -> None:
             erros.append(linha.decode("utf-8", "ignore").strip())
             del erros[:-20]
 
+    def ler_erros_fonte() -> None:
+        for linha in fonte.stderr:
+            t = linha.decode("utf-8", "ignore").strip()
+            if t:
+                erros.append("streamlink: " + t)
+                del erros[:-20]
+
     threading.Thread(target=ler_progresso, daemon=True).start()
     threading.Thread(target=ler_erros, daemon=True).start()
+    if fonte:
+        threading.Thread(target=ler_erros_fonte, daemon=True).start()
 
     medido = False
     try:
@@ -214,11 +242,14 @@ def _gravar_parte(live_id: int, info: dict, ctx: Contexto) -> None:
                     jobs.enfileirar("live_analisar", projeto_id=live["projeto_id"], params={"live_id": live_id},
                                     mensagem="Aguardando para analisar o trecho novo")
             if _deve_parar(live_id, ctx):
-                try:
-                    proc.stdin.write(b"q")  # pede para o FFmpeg fechar o arquivo direito
-                    proc.stdin.flush()
-                except OSError:
-                    pass
+                if fonte:  # sem dados novos o FFmpeg fecha o arquivo direito sozinho
+                    media.encerrar(fonte)
+                else:
+                    try:
+                        proc.stdin.write(b"q")  # pede para o FFmpeg fechar o arquivo direito
+                        proc.stdin.flush()
+                    except OSError:
+                        pass
                 try:
                     proc.wait(timeout=15)
                 except subprocess.TimeoutExpired:
@@ -226,6 +257,8 @@ def _gravar_parte(live_id: int, info: dict, ctx: Contexto) -> None:
                 break
     finally:
         media.encerrar(proc)
+        if fonte:
+            media.encerrar(fonte)
         if estado["dur"] > 0:
             db.executar("UPDATE live_partes SET duracao_s=? WHERE id=?", (estado["dur"], parte_id))
             _atualizar(live_id, gravado_s=deslocamento + estado["dur"])

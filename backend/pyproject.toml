@@ -13,6 +13,7 @@ dependencies = [
     "requests>=2.31",
     "onnxruntime>=1.18",            # recorte de fundo (modelo isnet do rembg)
     "opencv-python-headless>=4.9,<5",  # detecção de rosto (a 5.x removeu os classificadores Haar)
+    "streamlink>=7",
 ]
 
 [project.optional-dependencies]
