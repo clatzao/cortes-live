@@ -6,6 +6,7 @@ blocos de ~15 min cortados em pontos de silêncio, para não ocupar muita memór
 mesmo em lives de muitas horas.
 """
 import gc
+import importlib
 import json
 import os
 import threading
@@ -36,11 +37,17 @@ def _preparar_dlls_cuda() -> None:
     global _dlls_prontas
     if _dlls_prontas or os.name != "nt":
         return
-    _dlls_prontas = True
+    # As bibliotecas podem ter sido baixadas em segundo plano depois que o motor ligou:
+    # só marca como pronto quando o pacote existe, para tentar de novo na próxima transcrição.
+    importlib.invalidate_caches()
     try:
         import nvidia  # pacote presente só com o extra "gpu"
     except ImportError:
+        # quem instalou o CUDA 12 da NVIDIA à mão tem as DLLs no PATH
+        import ctypes.util
+        _dlls_prontas = ctypes.util.find_library("cublas64_12") is not None
         return
+    _dlls_prontas = True
     for base in getattr(nvidia, "__path__", []):
         for pasta_bin in Path(base).glob("*/bin"):
             os.add_dll_directory(str(pasta_bin))
@@ -76,9 +83,17 @@ def _carregar(ctx: Contexto) -> tuple[object, tuple[str, str, str]]:
     from faster_whisper import WhisperModel
 
     _preparar_dlls_cuda()
+    candidatos = _candidatos()
+    if os.name == "nt" and not _dlls_prontas and any(c[0] == "cuda" for c in candidatos):
+        # sem as DLLs a placa nem carrega: vai direto para o processador
+        candidatos = [c for c in candidatos if c[0] != "cuda"]
+        ctx.progresso(0.04, "As bibliotecas CUDA 12 da placa NVIDIA ainda não estão instaladas (o programa "
+                            "baixa sozinho em segundo plano); por enquanto a transcrição usa o processador.",
+                      forcar=True)
+        time.sleep(3)  # deixa a mensagem visível antes de "Carregando modelo"
     falhas = []
     with _lock:
-        for chave in _candidatos():
+        for chave in candidatos:
             disp, ct, nome = chave
             if _chave_modelo == chave and _modelo is not None:
                 return _modelo, chave

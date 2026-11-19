@@ -53,19 +53,26 @@ if errorlevel 1 (
 rem --- Python + bibliotecas ---
 echo [4/4] Instalando Python e bibliotecas (pode demorar na primeira vez)...
 pushd backend
-set "EXTRA="
-where nvidia-smi >nul 2>nul
-if not errorlevel 1 set "EXTRA=--extra gpu"
-if exist "%SystemRoot%\System32\nvidia-smi.exe" set "EXTRA=--extra gpu"
-if defined EXTRA (
-  echo Placa NVIDIA encontrada: instalando tambem as bibliotecas CUDA para a transcricao, cerca de 1,5 GB...
-)
-uv sync %EXTRA%
+uv sync --inexact
 if errorlevel 1 (
   popd
   echo ERRO ao instalar as bibliotecas.
   pause
   exit /b 1
+)
+rem Bibliotecas CUDA 12 (so com placa NVIDIA): opcionais; se o download falhar, transcreve pelo processador.
+set "NVIDIA="
+where nvidia-smi >nul 2>nul
+if not errorlevel 1 set "NVIDIA=1"
+if exist "%SystemRoot%\System32\nvidia-smi.exe" set "NVIDIA=1"
+if defined NVIDIA (
+  echo Placa NVIDIA encontrada: baixando as bibliotecas CUDA 12 para a transcricao, cerca de 1,5 GB...
+  set "UV_HTTP_TIMEOUT=600"
+  uv sync --inexact --extra gpu
+  if errorlevel 1 (
+    echo AVISO: nao deu para baixar as bibliotecas CUDA agora. O programa funciona normalmente
+    echo e transcreve pelo processador. Rode o instalar.bat de novo depois para tentar outra vez.
+  )
 )
 popd
 

@@ -51,18 +51,26 @@ Use apenas lives suas ou com permissão do criador.
 ## Instalação fácil: programa de desktop (Windows 10/11)
 
 1. Baixe o instalador:
-   **[Cortes.Live_0.3.0_x64-setup.exe](https://github.com/clatzao/cortes-live/releases/download/v0.3.0/Cortes.Live_0.3.0_x64-setup.exe)**
+   **[Cortes.Live_0.4.0_x64-setup.exe](https://github.com/clatzao/cortes-live/releases/download/v0.4.0/Cortes.Live_0.4.0_x64-setup.exe)**
    (12 MB; versões novas ficam em [Releases](https://github.com/clatzao/cortes-live/releases)) e abra. Ele instala só para o seu usuário
    (não pede administrador) e cria o atalho no menu Iniciar e na área de trabalho.
    Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**
    (o instalador não é assinado digitalmente).
 2. Abra o **Cortes Live**. Na **primeira vez** ele prepara tudo sozinho, com o progresso na tela:
-   baixa o FFmpeg (~200 MB, se o PC ainda não tiver), o Python e as bibliotecas (~400 MB; com placa NVIDIA,
-   mais ~1,5 GB de CUDA). Depois disso abre em poucos segundos.
+   baixa o FFmpeg (~200 MB, se o PC ainda não tiver) e o Python com as bibliotecas (~400 MB). Depois disso
+   abre em poucos segundos.
+   - **Placa NVIDIA:** as bibliotecas CUDA 12 da transcrição (~1,5 GB) baixam **em segundo plano**, com o
+     programa já aberto; até terminarem, a transcrição usa o processador. Se o download falhar (internet lenta
+     ou instável), o programa funciona normalmente e tenta de novo na próxima vez que abrir. Não precisa
+     instalar o CUDA da NVIDIA à mão; o andamento fica em `%LOCALAPPDATA%\br.cortes.live\cuda.log`.
 3. O programa abre na própria janela. Fechar a janela encerra tudo (inclusive exportações em andamento).
 
 Os projetos, ajustes e modelos de IA do programa instalado ficam em `%LOCALAPPDATA%\br.cortes.live`; os
-cortes prontos vão para `Vídeos\Cortes Live`. Para atualizar, instale a versão nova por cima.
+cortes prontos vão para `Vídeos\Cortes Live`.
+
+**Atualizações automáticas:** a partir da 0.4.0, ao abrir, o programa confere se há versão nova no GitHub; se
+houver, baixa, instala e reabre sozinho, sem perder projetos nem ajustes. Sem internet, ele só abre normalmente.
+Quem tem a 0.3.0 ou anterior precisa instalar a 0.4.0 por cima uma vez; daí em diante é automático.
 Para desinstalar: **Configurações do Windows → Aplicativos → Cortes Live**.
 
 ## Instalação pelo código (sem o instalador)
@@ -79,7 +87,8 @@ Use este caminho se preferir rodar pelo navegador ou não quiser o instalador.
    - **uv**: instala o Python 3.12 e as bibliotecas isoladas, sem mexer no resto do PC;
    - **FFmpeg**: via winget;
    - **Deno**: via winget, necessário para links do YouTube (pulado se o Node já existir);
-   - com placa **NVIDIA**: também as bibliotecas CUDA para a transcrição (~1,5 GB).
+   - com placa **NVIDIA**: também as bibliotecas CUDA 12 para a transcrição (~1,5 GB). Se esse download
+     falhar, ele só avisa e o programa transcreve pelo processador; rode o `instalar.bat` de novo depois.
 
    Se ele avisar que instalou o FFmpeg ou o Deno, feche a janela antes do passo 3.
 3. Dê dois cliques em **`iniciar.bat`**. O navegador abre sozinho em http://127.0.0.1:8765.
@@ -254,6 +263,12 @@ cd desktop
 npm install
 npm run build   # gera desktop/src-tauri/target/release/bundle/nsis/Cortes Live_<versão>_x64-setup.exe
 ```
+
+As atualizações automáticas são assinadas: o `npm run build` usa a chave privada
+`%USERPROFILE%\.tauri\cortes-live.key` (fora do repositório; sem ela não dá para publicar atualizações) e gera
+também o `.exe.sig`. Para publicar: aumente a versão em `package.json`, `tauri.conf.json` e `Cargo.toml`,
+compile e crie a release com o instalador e um `latest.json` (versão, assinatura do `.sig` e link do
+instalador). O programa lê `releases/latest/download/latest.json`.
 
 O app em Rust (`desktop/src-tauri/src/main.rs`) mostra a tela de abertura, baixa o FFmpeg, instala o Python e
 as bibliotecas com o `uv` embutido, liga o motor numa porta livre e o encerra junto com a janela (job object

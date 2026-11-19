@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::{Manager, RunEvent, State};
+use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -126,6 +127,9 @@ fn preparar_e_ligar(app: &tauri::AppHandle, m: &Motor) -> Result<(), String> {
         return Err(format!("Arquivos do programa não encontrados em {}. Reinstale o Cortes Live.", p.motor.display()));
     }
 
+    // 0) Versão nova no GitHub? Baixa, instala e reabre sozinho (sem internet, só segue).
+    atualizar(app, m, &p);
+
     // 1) FFmpeg
     if !tem_ffmpeg(&p.ferramentas()) {
         baixar_ffmpeg(m, &p.ferramentas())?;
@@ -176,7 +180,113 @@ fn preparar_e_ligar(app: &tauri::AppHandle, m: &Motor) -> Result<(), String> {
         thread::sleep(Duration::from_millis(400));
     }
     m.estado.lock().unwrap().url = Some(format!("http://127.0.0.1:{porta}/"));
+
+    // 5) Bibliotecas CUDA 12 (placa NVIDIA): baixam em segundo plano, sem travar a abertura.
+    //    Se o download falhar, a transcrição usa o processador e tenta de novo na próxima abertura.
+    if sistema("nvidia-smi.exe").exists() && !tem_cuda(&p) {
+        thread::spawn(move || baixar_cuda(&p));
+    }
     Ok(())
+}
+
+fn tem_cuda(p: &Pastas) -> bool {
+    let nv = p.venv().join("Lib").join("site-packages").join("nvidia");
+    nv.join("cublas").join("bin").exists() && nv.join("cudnn").join("bin").exists()
+}
+
+fn baixar_cuda(p: &Pastas) {
+    let mut log = match File::create(p.base.join("cuda.log")) {
+        Ok(f) => f,
+        Err(_) => return,
+    };
+    for tentativa in 1..=3 {
+        let _ = writeln!(log, "Tentativa {tentativa} de baixar as bibliotecas CUDA 12 (~1,5 GB)");
+        let saida = match log.try_clone() {
+            Ok(f) => f,
+            Err(_) => return,
+        };
+        let filho = comando(p.motor.join("uv.exe"))
+            .args(["sync", "--frozen", "--inexact", "--extra", "gpu", "--project"])
+            .arg(p.motor.join("backend"))
+            .env("UV_PROJECT_ENVIRONMENT", p.venv())
+            .env("UV_PYTHON_PREFERENCE", "only-managed")
+            .env("UV_HTTP_TIMEOUT", "600") // os arquivos são grandes (até 700 MB cada)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(saida)
+            .spawn();
+        let mut filho = match filho {
+            Ok(f) => f,
+            Err(e) => {
+                let _ = writeln!(log, "Não deu para rodar o uv: {e}");
+                return;
+            }
+        };
+        #[cfg(windows)]
+        prender_no_job(&filho); // fecha junto com o programa
+        if filho.wait().map(|s| s.success()).unwrap_or(false) && tem_cuda(p) {
+            let _ = writeln!(log, "Pronto: a transcrição já pode usar a placa NVIDIA.");
+            return;
+        }
+        thread::sleep(Duration::from_secs(30));
+    }
+    let _ = writeln!(log, "Não deu para baixar agora; o programa tenta de novo na próxima vez que abrir.");
+}
+
+/// Confere no GitHub se há versão nova (arquivo latest.json da última release, assinado).
+/// Se houver, baixa e roda o instalador; o Windows fecha o programa e o reabre já atualizado.
+/// Qualquer falha (sem internet, GitHub fora do ar) só é registrada e o programa abre normalmente.
+fn atualizar(app: &tauri::AppHandle, m: &Motor, p: &Pastas) {
+    let mut log = File::create(p.base.join("atualizacao.log")).ok();
+    let mut anotar = |t: &str| {
+        if let Some(f) = log.as_mut() {
+            let _ = writeln!(f, "{t}");
+        }
+    };
+    definir(m, "Procurando atualização", "");
+    let mut construtor = app.updater_builder().timeout(Duration::from_secs(20));
+    // para testes: CORTES_ATUALIZACAO_URL aponta para outro latest.json
+    if let Some(url) = std::env::var("CORTES_ATUALIZACAO_URL").ok().and_then(|u| u.parse().ok()) {
+        match construtor.endpoints(vec![url]) {
+            Ok(c) => construtor = c,
+            Err(e) => return anotar(&format!("Endereço de teste inválido: {e}")),
+        }
+    }
+    let atualizador = match construtor.build() {
+        Ok(a) => a,
+        Err(e) => return anotar(&format!("Atualizador indisponível: {e}")),
+    };
+    let resultado = tauri::async_runtime::block_on(async {
+        let Some(nova) = atualizador.check().await? else {
+            return Ok(None);
+        };
+        let versao = nova.version.clone();
+        let etapa = format!("Baixando a versão {versao}");
+        definir(m, &etapa, "");
+        let mut baixado = 0usize;
+        nova.download_and_install(
+            |pedaco, total| {
+                baixado += pedaco;
+                let mb = baixado as f64 / 1_048_576.0;
+                let texto = match total {
+                    Some(t) => format!("{mb:.1} de {:.1} MB", t as f64 / 1_048_576.0),
+                    None => format!("{mb:.1} MB"),
+                };
+                definir(m, &etapa, &texto);
+            },
+            || definir(m, "Instalando a atualização", "O programa reabre sozinho em seguida."),
+        )
+        .await?;
+        Ok::<_, tauri_plugin_updater::Error>(Some(versao))
+    });
+    match resultado {
+        Ok(None) => anotar(&format!("Versão {} é a mais nova.", app.package_info().version)),
+        Ok(Some(v)) => {
+            anotar(&format!("Atualizado para {v}."));
+            app.restart();
+        }
+        Err(e) => anotar(&format!("Não deu para atualizar agora: {e}")),
+    }
 }
 
 fn tem_ffmpeg(ferr: &Path) -> bool {
@@ -245,18 +355,14 @@ fn instalar_bibliotecas(m: &Motor, p: &Pastas) -> Result<(), String> {
         "Conferindo as bibliotecas"
     };
     definir(m, etapa, "");
-    let gpu = sistema("nvidia-smi.exe").exists();
     let mut c = comando(p.motor.join("uv.exe"));
-    c.args(["sync", "--frozen", "--project"])
+    c.args(["sync", "--frozen", "--inexact", "--project"])
         .arg(p.motor.join("backend"))
         .env("UV_PROJECT_ENVIRONMENT", p.venv())
         .env("UV_PYTHON_PREFERENCE", "only-managed")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
-    if gpu {
-        c.args(["--extra", "gpu"]); // bibliotecas CUDA para a transcrição na placa NVIDIA
-    }
     let mut filho = c.spawn().map_err(|e| format!("Não foi possível rodar o instalador de bibliotecas: {e}"))?;
     let mut ultimas = Vec::new();
     if let Some(saida) = filho.stderr.take() {
@@ -340,6 +446,7 @@ fn main() {
                 let _ = w.set_focus();
             }
         }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(motor.clone())
         .invoke_handler(tauri::generate_handler![estado, tentar_de_novo, abrir_registro])
         .setup(|app| {

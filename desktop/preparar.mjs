@@ -25,3 +25,17 @@ limpar(join(raiz, "backend", "app"));
 if (!statSync(join(raiz, "frontend", "dist", "index.html"), { throwIfNoEntry: false })) {
   throw new Error("Falta frontend/dist: rode 'npm run build' na pasta frontend antes.");
 }
+
+// "npm run build": compila com a chave que assina as atualizações automáticas.
+// A chave fica fora do repositório (%USERPROFILE%\.tauri\cortes-live.key); sem ela as atualizações não funcionam.
+if (process.argv.includes("--compilar")) {
+  const chave = process.env.TAURI_SIGNING_PRIVATE_KEY || join(process.env.USERPROFILE || "", ".tauri", "cortes-live.key");
+  if (!statSync(chave, { throwIfNoEntry: false }) && !process.env.TAURI_SIGNING_PRIVATE_KEY) {
+    throw new Error("Falta a chave de assinatura das atualizações: " + chave);
+  }
+  execSync("npx tauri build", {
+    stdio: "inherit",
+    cwd: aqui,
+    env: { ...process.env, TAURI_SIGNING_PRIVATE_KEY: chave, TAURI_SIGNING_PRIVATE_KEY_PASSWORD: process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? "" },
+  });
+}
