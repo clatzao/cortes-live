@@ -133,7 +133,10 @@ def reprocessar_projeto(projeto_id: int):
 def apagar_projeto(projeto_id: int):
     """Apaga o projeto e seus arquivos internos (preview, download). O arquivo local original e
     os cortes já exportados NÃO são apagados."""
-    _projeto(projeto_id)
+    p = _projeto(projeto_id)
+    if p.get("live_id") and db.um("SELECT id FROM lives WHERE id=? AND status IN "
+                                  "('aguardando','gravando','reconectando','finalizando')", (p["live_id"],)):
+        raise HTTPException(400, "Esta live ainda está sendo gravada. Pare a gravação antes de apagar.")
     for j in db.listar("SELECT id FROM jobs WHERE projeto_id=? AND status IN ('na_fila','executando')",
                        (projeto_id,)):
         jobs.cancelar(j["id"])

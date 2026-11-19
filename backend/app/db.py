@@ -96,6 +96,50 @@ CREATE TABLE IF NOT EXISTS sugestoes (
 )
 _conn.commit()
 
+# ---------------------------------------------------------------- monitor de live (rodada 3)
+_conn.executescript(
+    """
+CREATE TABLE IF NOT EXISTS lives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plataforma TEXT NOT NULL CHECK (plataforma IN ('twitch','kick','youtube')),
+    canal TEXT NOT NULL,
+    url TEXT NOT NULL,
+    titulo TEXT,
+    status TEXT NOT NULL DEFAULT 'aguardando'
+        CHECK (status IN ('aguardando','gravando','reconectando','finalizando','encerrada','erro','cancelada')),
+    erro TEXT,
+    projeto_id INTEGER REFERENCES projetos(id) ON DELETE SET NULL,
+    janela_s INTEGER NOT NULL DEFAULT 180,       -- de quanto em quanto tempo gravado analisar
+    analisado_ate REAL NOT NULL DEFAULT 0,       -- segundos já transcritos e analisados
+    gravado_s REAL NOT NULL DEFAULT 0,
+    cortes_criados INTEGER NOT NULL DEFAULT 0,
+    parar INTEGER NOT NULL DEFAULT 0,            -- pedido de parar (o job de gravação lê)
+    ultima_analise TEXT,                         -- resumo da última análise (para a tela)
+    iniciada_em REAL,
+    encerrada_em REAL,
+    criado_em REAL NOT NULL,
+    atualizado_em REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS lives_status ON lives (status);
+CREATE INDEX IF NOT EXISTS lives_projeto ON lives (projeto_id);
+CREATE UNIQUE INDEX IF NOT EXISTS lives_um_ativo_por_canal ON lives (plataforma, url)
+    WHERE status IN ('aguardando','gravando','reconectando','finalizando');
+CREATE TABLE IF NOT EXISTS live_partes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    live_id INTEGER NOT NULL REFERENCES lives(id) ON DELETE CASCADE,
+    ordem INTEGER NOT NULL,
+    caminho TEXT NOT NULL,
+    deslocamento_s REAL NOT NULL,                -- onde a parte começa na linha do tempo da live
+    duracao_s REAL NOT NULL DEFAULT 0,
+    criado_em REAL NOT NULL,
+    UNIQUE (live_id, ordem)
+);
+"""
+)
+_conn.commit()
+_adicionar_coluna("projetos", "live_id", "INTEGER REFERENCES lives(id) ON DELETE SET NULL")
+_adicionar_coluna("cortes", "origem", "TEXT NOT NULL DEFAULT 'manual'")  # manual, sugestao ou live
+
 
 def executar(sql: str, params: tuple = ()) -> int:
     """Executa um comando de escrita e devolve o id da última linha inserida."""

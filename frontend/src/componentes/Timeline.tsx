@@ -34,7 +34,7 @@ const PEGA = 6; // px de tolerância para pegar uma borda
 const DUR_MIN = 0.5;
 
 const NOMES_CORES = ["--tl-fundo", "--tl-regua", "--tl-linha", "--texto-sutil", "--tl-onda", "--tl-onda-forte",
-  "--destaque", "--tl-corte", "--tl-corte-texto", "--tl-selecao", "--tl-cabeca"] as const;
+  "--destaque-cheio", "--tl-corte", "--tl-corte-texto", "--tl-selecao", "--tl-cabeca"] as const;
 type Cores = Record<(typeof NOMES_CORES)[number], string>;
 
 /** Lê as cores do tema uma vez (getComputedStyle a cada quadro era caro). */
@@ -255,7 +255,7 @@ export default function Timeline(p: Props) {
       const x1 = x(corte.inicio);
       const x2 = x(corte.fim);
       const ativo = corte.id === p.corteAtivo || corte.id === provisorio?.id;
-      const cor = cores[ativo ? "--destaque" : "--tl-corte"];
+      const cor = cores[ativo ? "--destaque-cheio" : "--tl-corte"];
       c.fillStyle = cor;
       c.fillRect(x1, Y_REGUA + 2, Math.max(2, x2 - x1), Y_FAIXA - Y_REGUA - 4);
       c.globalAlpha = ativo ? 0.28 : 0.14;

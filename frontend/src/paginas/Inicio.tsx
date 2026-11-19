@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Check, Download, Film, FolderOpen, Loader2, RotateCcw, Scissors, Sparkles, Trash2, Upload, Wand2, X } from "lucide-react";
+import { Check, Download, Film, FolderOpen, Loader2, Radio, RotateCcw, Scissors, Sparkles, Trash2, Upload, Wand2, X } from "lucide-react";
 import { api, avisar, erroTexto, Projeto } from "../api";
 import Progresso from "../componentes/Progresso";
 import { duracaoCurta } from "../tempo";
@@ -7,6 +7,7 @@ import { duracaoCurta } from "../tempo";
 const ROTULO_STATUS: Record<Projeto["status"], string> = {
   na_fila: "Na fila",
   processando: "Processando",
+  gravando: "Gravando a live",
   pronto: "Pronto",
   erro: "Erro",
 };
@@ -173,7 +174,7 @@ export default function Inicio() {
                     {p.status !== "pronto" && <span className={`status status-${p.status}`}>{ROTULO_STATUS[p.status]}</span>}
                   </div>
                   <div className="sutil projeto-info">
-                    {p.origem === "link" ? "Link" : "Arquivo"}
+                    {p.origem === "live" ? "Live" : p.origem === "link" ? "Link" : "Arquivo"}
                     {p.altura ? ` · ${p.altura}p${p.fps ? Math.round(p.fps) : ""}` : ""}
                   </div>
                   {andamento && <Progresso valor={p.job!.progresso} texto={p.job!.mensagem} />}
@@ -190,7 +191,12 @@ export default function Inicio() {
                         <Upload size={15} /> Exportar todos
                       </button>
                     )}
-                    {p.status === "erro" && (
+                    {p.live_id && !pronto && (
+                      <a className="btn btn-primario" href={`#/live/${p.live_id}`}>
+                        <Radio size={15} /> Ver a live
+                      </a>
+                    )}
+                    {p.status === "erro" && p.origem !== "live" && (
                       <button className="btn" onClick={() => reprocessar(p)}>
                         <RotateCcw size={15} /> Tentar de novo
                       </button>

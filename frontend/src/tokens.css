@@ -1,0 +1,100 @@
+/* GERADO por replica/design/gerar_tokens.py a partir de tokens.json. Não edite à mão. */
+/* Estúdio escuro é o padrão; claro só se escolhido. */
+
+:root {
+  --fundo: #0b0c10;
+  --superficie: #13151b;
+  --superficie-2: #1b1e26;
+  --superficie-3: #232733;
+  --campo: #0f1116;
+  --borda: #252935;
+  --borda-forte: #343a4a;
+  --borda-campo: #5a6275;
+  --texto: #eceef3;
+  --texto-sutil: #8d95a6;
+  --destaque: #8c70ff;
+  --destaque-forte: #9479ff;
+  --destaque-texto: #ffffff;
+  --destaque-cheio: #6a48f0;
+  --destaque-cheio-hover: #5f3fe6;
+  --perigo: #ff5d5d;
+  --ok: #34d17d;
+  --aviso: #f5b443;
+  --ao-vivo: #e5243b;
+  --ao-vivo-texto: #ffffff;
+  --tl-corte: #2f6ae6;
+  --tl-corte-texto: #ffffff;
+  --destaque-suave: rgba(124, 92, 255, 0.16);
+  --tl-fundo: #0e1015;
+  --tl-regua: #161922;
+  --tl-linha: rgba(255, 255, 255, 0.06);
+  --tl-onda: #4c5568;
+  --tl-onda-forte: #f59e0b;
+  --tl-selecao: #ffb020;
+  --tl-cabeca: #ff3b5c;
+  --sombra: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+  --sombra-modal: 0 24px 64px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --fundo: #f3f4f7;
+  --superficie: #ffffff;
+  --superficie-2: #eef0f4;
+  --superficie-3: #e3e6ec;
+  --campo: #f8f9fb;
+  --borda: #dde1e8;
+  --borda-forte: #c7ccd6;
+  --borda-campo: #868e9c;
+  --texto: #15171c;
+  --texto-sutil: #5c6474;
+  --destaque: #6a46ff;
+  --destaque-forte: #5a36f0;
+  --destaque-texto: #ffffff;
+  --destaque-cheio: #6a46ff;
+  --destaque-cheio-hover: #5a36f0;
+  --perigo: #d93a3a;
+  --ok: #157f43;
+  --aviso: #94600a;
+  --ao-vivo: #d11f35;
+  --ao-vivo-texto: #ffffff;
+  --tl-corte: #2f6ae6;
+  --tl-corte-texto: #ffffff;
+  --destaque-suave: rgba(106, 70, 255, 0.1);
+  --tl-fundo: #e8ebf0;
+  --tl-regua: #dde1e8;
+  --tl-linha: rgba(0, 0, 0, 0.08);
+  --tl-onda: #8a93a3;
+  --tl-onda-forte: #d9822b;
+  --tl-selecao: #f0a000;
+  --tl-cabeca: #e5383b;
+  --sombra: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 12px rgba(16, 24, 40, 0.04);
+  --sombra-modal: 0 24px 64px rgba(16, 24, 40, 0.25);
+  color-scheme: light;
+}
+
+:root {
+  --esp-0: 0px;
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-5: 20px;
+  --esp-6: 24px;
+  --esp-7: 32px;
+  --esp-8: 48px;
+  --raio-xs: 4px;
+  --raio-sm: 6px;
+  --raio-md: 8px;
+  --raio-lg: 12px;
+  --raio-pill: 999px;
+  --fonte-xs: 11px;
+  --fonte-sm: 12px;
+  --fonte-base: 13.5px;
+  --fonte-md: 15px;
+  --fonte-lg: 19px;
+  --fonte-display: 28px;
+  --rapido: 120ms;
+  --normal: 200ms;
+  --curva: cubic-bezier(.2,.8,.2,1);
+}

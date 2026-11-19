@@ -10,14 +10,15 @@ export interface JobResumo {
 export interface Projeto {
   id: number;
   nome: string;
-  origem: "arquivo" | "link";
+  origem: "arquivo" | "link" | "live";
   entrada: string;
   caminho_original: string | null;
   duracao: number | null;
   largura: number | null;
   altura: number | null;
   fps: number | null;
-  status: "na_fila" | "processando" | "pronto" | "erro";
+  status: "na_fila" | "processando" | "gravando" | "pronto" | "erro";
+  live_id: number | null;
   erro: string | null;
   criado_em: number;
   idioma: Idioma;
@@ -229,6 +230,51 @@ export interface Hardware {
   };
 }
 
+export type StatusLive = "aguardando" | "gravando" | "reconectando" | "finalizando" | "encerrada" | "erro" | "cancelada";
+
+export interface Live {
+  id: number;
+  plataforma: "twitch" | "kick" | "youtube";
+  canal: string;
+  url: string;
+  titulo: string | null;
+  status: StatusLive;
+  erro: string | null;
+  projeto_id: number | null;
+  janela_s: number;
+  analisado_ate: number;
+  gravado_s: number;
+  cortes_criados: number;
+  parar: number;
+  ultima_analise: string | null;
+  iniciada_em: number | null;
+  encerrada_em: number | null;
+  criado_em: number;
+  partes: number;
+  job_gravacao: JobResumo | null;
+  job_analise: JobResumo | null;
+  job_final: JobResumo | null;
+  projeto_status: Projeto["status"] | null;
+}
+
+export interface CorteLive {
+  id: number;
+  nome: string;
+  inicio: number;
+  fim: number;
+  gancho: string | null;
+  criado_em: number;
+  nota: number | null;
+  motivo: string | null;
+  fonte: "gemini" | "sinais" | null;
+  exportavel: boolean;
+}
+
+export interface LiveDetalhe extends Live {
+  disco_livre_gb: number;
+  cortes: CorteLive[];
+}
+
 async function req<T>(url: string, metodo = "GET", corpo?: unknown): Promise<T> {
   const r = await fetch(url, {
     method: metodo,
@@ -367,6 +413,12 @@ export const api = {
   limparFila: () => req<{ ok: boolean }>("/api/fila/finalizados", "DELETE"),
   abrirSaida: (id: number) => req<{ ok: boolean }>(`/api/fila/${id}/abrir`, "POST"),
   abrirExportados: () => req<{ ok: boolean }>("/api/abrir-exportados", "POST"),
+
+  lives: () => req<Live[]>("/api/lives"),
+  live: (id: number) => req<LiveDetalhe>(`/api/lives/${id}`),
+  criarLive: (entrada: string, idioma: Idioma) => req<Live>("/api/lives", "POST", { entrada, idioma }),
+  pararLive: (id: number) => req<Live>(`/api/lives/${id}/parar`, "POST"),
+  removerLive: (id: number) => req<{ ok: boolean }>(`/api/lives/${id}`, "DELETE"),
 };
 
 /** Mostra uma mensagem rápida no canto da tela. */

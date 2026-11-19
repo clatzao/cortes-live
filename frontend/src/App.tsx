@@ -5,18 +5,31 @@ import Inicio from "./paginas/Inicio";
 import Editor from "./paginas/Editor";
 import Fila from "./paginas/Fila";
 import Ajustes, { AbaAjustes } from "./paginas/Ajustes";
+import Lives from "./paginas/Lives";
+import LivePagina from "./paginas/LivePagina";
+import { lazy, Suspense } from "react";
+
+// Amostra das peças de interface: só no modo dev (não entra no programa instalado).
+const Design = import.meta.env.DEV ? lazy(() => import("./paginas/Design")) : null;
 
 type Rota =
   | { pagina: "inicio" }
   | { pagina: "projeto"; id: number }
   | { pagina: "fila" }
-  | { pagina: "ajustes"; aba: AbaAjustes };
+  | { pagina: "ajustes"; aba: AbaAjustes }
+  | { pagina: "lives" }
+  | { pagina: "live"; id: number }
+  | { pagina: "design" };
 
 function lerRota(): Rota {
   const h = window.location.hash.replace(/^#\/?/, "");
   const m = h.match(/^projeto\/(\d+)/);
   if (m) return { pagina: "projeto", id: Number(m[1]) };
+  const ml = h.match(/^live\/(\d+)/);
+  if (ml) return { pagina: "live", id: Number(ml[1]) };
+  if (h.startsWith("lives")) return { pagina: "lives" };
   if (h.startsWith("fila")) return { pagina: "fila" };
+  if (import.meta.env.DEV && h.startsWith("design")) return { pagina: "design" };
   // endereços antigos continuam funcionando
   if (h.startsWith("ajustes/padrao")) return { pagina: "ajustes", aba: "padrao" };
   if (h.startsWith("legendas") || h.startsWith("ajustes/legendas")) return { pagina: "ajustes", aba: "legendas" };
@@ -128,6 +141,9 @@ export default function App() {
           <a href="#/" className={rota.pagina === "inicio" || rota.pagina === "projeto" ? "ativo" : ""}>
             Projetos
           </a>
+          <a href="#/lives" className={rota.pagina === "lives" || rota.pagina === "live" ? "ativo" : ""}>
+            Lives
+          </a>
           <a href="#/ajustes/padrao" className={rota.pagina === "ajustes" ? "ativo" : ""}>
             Ajustes
           </a>
@@ -156,7 +172,14 @@ export default function App() {
         {rota.pagina === "inicio" && <Inicio />}
         {rota.pagina === "projeto" && <Editor key={rota.id} id={rota.id} fila={fila} />}
         {rota.pagina === "fila" && <Fila fila={fila} />}
+        {rota.pagina === "lives" && <Lives />}
+        {rota.pagina === "live" && <LivePagina key={rota.id} id={rota.id} />}
         {rota.pagina === "ajustes" && <Ajustes aba={rota.aba} hw={hw} onHw={setHw} />}
+        {rota.pagina === "design" && Design && (
+          <Suspense fallback={null}>
+            <Design />
+          </Suspense>
+        )}
       </main>
 
       <div className="avisos" role="status">

@@ -4,7 +4,8 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config, hardware, jobs, legendas
 from . import tarefas  # noqa: F401  (registra os jobs na fila)
-from .rotas import cortes, fila, legendas as rotas_legendas, marca, momentos, projetos, sistema, thumbs
+from . import live  # noqa: F401  (registra os jobs do monitor de live)
+from .rotas import cortes, fila, legendas as rotas_legendas, lives, marca, momentos, projetos, sistema, thumbs
 
 app = FastAPI(title="Cortes Live")
 
@@ -15,7 +16,7 @@ def _inicio() -> None:
     jobs.iniciar()
 
 
-for modulo in (sistema, projetos, cortes, rotas_legendas, marca, momentos, fila, thumbs):
+for modulo in (sistema, projetos, cortes, rotas_legendas, marca, momentos, fila, thumbs, lives):
     app.include_router(modulo.router)
 
 # fontes usadas nas legendas, servidas para o editor de thumb desenhar com as mesmas

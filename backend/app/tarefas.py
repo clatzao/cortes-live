@@ -227,7 +227,13 @@ def exportar(ctx: Contexto) -> str:
     if not c:
         raise RuntimeError("O corte foi removido.")
     p = db.um("SELECT * FROM projetos WHERE id=?", (c["projeto_id"],))
-    if not p or p["status"] != "pronto" or not p["caminho_original"]:
+    if not p or not p["caminho_original"]:
+        raise RuntimeError("O projeto deste corte não está pronto.")
+    if p["status"] == "gravando":  # live ainda gravando: só cortes inteiros na 1ª parte (sem emendas)
+        from . import live
+        if not live.parte_da_live(p, c["inicio"], c["fim"]):
+            raise RuntimeError("Este corte só pode ser exportado quando a live terminar de gravar.")
+    elif p["status"] != "pronto":
         raise RuntimeError("O projeto deste corte não está pronto.")
     if not Path(p["caminho_original"]).is_file():
         raise RuntimeError(f"O vídeo original sumiu: {p['caminho_original']}")
