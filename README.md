@@ -35,8 +35,9 @@ O visual abre no tema escuro; o botão de sol/lua no canto troca para o claro (a
 
 ## Instalação fácil: programa de desktop (Windows 10/11)
 
-1. Baixe o **`Cortes Live_<versão>_x64-setup.exe`** em
-   [Releases](https://github.com/clatzao/cortes-live/releases) e abra. Ele instala só para o seu usuário
+1. Baixe o instalador:
+   **[Cortes.Live_0.2.0_x64-setup.exe](https://github.com/clatzao/cortes-live/releases/download/v0.2.0/Cortes.Live_0.2.0_x64-setup.exe)**
+   (12 MB; versões novas ficam em [Releases](https://github.com/clatzao/cortes-live/releases)) e abra. Ele instala só para o seu usuário
    (não pede administrador) e cria o atalho no menu Iniciar e na área de trabalho.
    Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**
    (o instalador não é assinado digitalmente).
