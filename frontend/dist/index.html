@@ -5,14 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cortes Live</title>
     <script>
-      // Aplica o tema salvo antes de desenhar a página (evita piscar).
+      // Aplica o tema salvo antes de desenhar a página (evita piscar). Padrão: escuro (estúdio).
       try {
         var t = localStorage.getItem("tema");
-        if (t === "claro" || t === "escuro") document.documentElement.dataset.theme = t === "claro" ? "light" : "dark";
-      } catch (e) {}
+        document.documentElement.dataset.theme = t === "claro" ? "light" : "dark";
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
     </script>
-    <script type="module" crossorigin src="/assets/index-tdzgIj5K.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-_BdFZq0V.css">
+    <script type="module" crossorigin src="/assets/index-DqHTQgX6.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-B3s4T-uE.css">
   </head>
   <body>
     <div id="root"></div>

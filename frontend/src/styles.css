@@ -1,79 +1,63 @@
-/* ---------- Tokens de cor (claro) ---------- */
+/* ---------- Tokens de cor: estúdio escuro é o padrão; claro só se escolhido ---------- */
 :root {
-  --fundo: #f4f5f7;
+  --fundo: #0b0c10;
+  --superficie: #13151b;
+  --superficie-2: #1b1e26;
+  --superficie-3: #232733;
+  --campo: #0f1116;
+  --borda: #252935;
+  --borda-forte: #343a4a;
+  --texto: #eceef3;
+  --texto-sutil: #8d95a6;
+  --destaque: #7c5cff;
+  --destaque-forte: #9479ff;
+  --destaque-suave: rgba(124, 92, 255, 0.16);
+  --destaque-texto: #ffffff;
+  --perigo: #ff5d5d;
+  --ok: #34d17d;
+  --aviso: #f5b443;
+  --tl-fundo: #0e1015;
+  --tl-regua: #161922;
+  --tl-linha: rgba(255, 255, 255, 0.06);
+  --tl-onda: #4c5568;
+  --tl-onda-forte: #f59e0b;
+  --tl-corte: #3d7bff;
+  --tl-corte-texto: #ffffff;
+  --tl-selecao: #ffb020;
+  --tl-cabeca: #ff3b5c;
+  --sombra: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+  --sombra-modal: 0 24px 64px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --fundo: #f3f4f7;
   --superficie: #ffffff;
-  --superficie-2: #eef0f3;
-  --borda: #d9dde3;
-  --texto: #16181d;
-  --texto-sutil: #5d6573;
-  --destaque: #7c4dff;
+  --superficie-2: #eef0f4;
+  --superficie-3: #e3e6ec;
+  --campo: #f8f9fb;
+  --borda: #dde1e8;
+  --borda-forte: #c7ccd6;
+  --texto: #15171c;
+  --texto-sutil: #5c6474;
+  --destaque: #6a46ff;
+  --destaque-forte: #5a36f0;
+  --destaque-suave: rgba(106, 70, 255, 0.1);
   --destaque-texto: #ffffff;
   --perigo: #d93a3a;
-  --ok: #1f9d55;
-  --aviso: #c27c0e;
-  --tl-fundo: #e9ecf1;
-  --tl-regua: #dde1e7;
+  --ok: #1a9a52;
+  --aviso: #b8740a;
+  --tl-fundo: #e8ebf0;
+  --tl-regua: #dde1e8;
   --tl-linha: rgba(0, 0, 0, 0.08);
   --tl-onda: #8a93a3;
   --tl-onda-forte: #d9822b;
-  --tl-corte: #4f9dff;
+  --tl-corte: #3d7bff;
   --tl-corte-texto: #ffffff;
-  --tl-selecao: #ffb020;
+  --tl-selecao: #f0a000;
   --tl-cabeca: #e5383b;
-  --sombra: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --sombra: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 12px rgba(16, 24, 40, 0.04);
+  --sombra-modal: 0 24px 64px rgba(16, 24, 40, 0.25);
   color-scheme: light;
-}
-
-/* ---------- Tokens de cor (escuro) ---------- */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --fundo: #0f1115;
-    --superficie: #171a20;
-    --superficie-2: #1f232b;
-    --borda: #2b303a;
-    --texto: #e7e9ee;
-    --texto-sutil: #9aa2b1;
-    --destaque: #9b7bff;
-    --destaque-texto: #0f1115;
-    --perigo: #ff6b6b;
-    --ok: #3ecf7a;
-    --aviso: #f0b44c;
-    --tl-fundo: #12151a;
-    --tl-regua: #1b1f26;
-    --tl-linha: rgba(255, 255, 255, 0.06);
-    --tl-onda: #5b6474;
-    --tl-onda-forte: #f59e0b;
-    --tl-corte: #3b82f6;
-    --tl-corte-texto: #ffffff;
-    --tl-selecao: #ffb020;
-    --tl-cabeca: #ff4d4f;
-    --sombra: none;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --fundo: #0f1115;
-  --superficie: #171a20;
-  --superficie-2: #1f232b;
-  --borda: #2b303a;
-  --texto: #e7e9ee;
-  --texto-sutil: #9aa2b1;
-  --destaque: #9b7bff;
-  --destaque-texto: #0f1115;
-  --perigo: #ff6b6b;
-  --ok: #3ecf7a;
-  --aviso: #f0b44c;
-  --tl-fundo: #12151a;
-  --tl-regua: #1b1f26;
-  --tl-linha: rgba(255, 255, 255, 0.06);
-  --tl-onda: #5b6474;
-  --tl-onda-forte: #f59e0b;
-  --tl-corte: #3b82f6;
-  --tl-corte-texto: #ffffff;
-  --tl-selecao: #ffb020;
-  --tl-cabeca: #ff4d4f;
-  --sombra: none;
-  color-scheme: dark;
 }
 
 * {
@@ -1706,3 +1690,270 @@ kbd {
 
 /* ---------------------------------------------------------------- timeline: zoom */
 .timeline-zoom { width: 110px; flex: 0 0 auto; }
+
+/* ================================================================
+   Visual estúdio (parte 4): camadas, contraste e um destaque vivo.
+   Fica no fim para valer sobre as regras antigas.
+   ================================================================ */
+html,
+body {
+  font: 13.5px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+h1 {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+h2 {
+  font-size: 15px;
+  font-weight: 650;
+}
+::selection {
+  background: var(--destaque-suave);
+}
+
+/* barras de rolagem finas, no tom do tema */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--borda-forte) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--borda-forte);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+/* topo */
+.topo {
+  padding: 8px 16px;
+  gap: 18px;
+  background: color-mix(in srgb, var(--superficie) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+.marca {
+  letter-spacing: -0.01em;
+}
+.marca-ponto {
+  background: linear-gradient(135deg, var(--tl-cabeca), var(--destaque));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--tl-cabeca) 55%, transparent);
+}
+.topo nav {
+  background: var(--campo);
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  padding: 3px;
+}
+.topo nav a {
+  padding: 5px 14px;
+  font-weight: 500;
+}
+.topo nav a.ativo {
+  background: var(--superficie-3);
+  color: var(--texto);
+}
+.chip {
+  background: var(--campo);
+}
+
+/* superfícies */
+.conteudo {
+  padding: 18px 20px 28px;
+}
+.cartao,
+.editor-lateral,
+.timeline,
+.modal {
+  border-color: var(--borda);
+  border-radius: 12px;
+  box-shadow: var(--sombra);
+}
+.modal {
+  box-shadow: var(--sombra-modal);
+}
+.modal-fundo {
+  background: rgba(4, 5, 8, 0.7);
+  backdrop-filter: blur(3px);
+}
+
+/* botões */
+.btn,
+.btn-icone {
+  background: var(--superficie-2);
+  border-color: var(--borda);
+  border-radius: 8px;
+  font-weight: 500;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.06s;
+}
+.btn:hover:not(:disabled),
+.btn-icone:hover:not(:disabled) {
+  background: var(--superficie-3);
+  border-color: var(--borda-forte);
+}
+.btn:active:not(:disabled),
+.btn-icone:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn-primario {
+  background: var(--destaque);
+  border-color: transparent;
+  color: var(--destaque-texto);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--destaque) 35%, transparent);
+}
+.btn-primario:hover:not(:disabled) {
+  background: var(--destaque-forte);
+  border-color: transparent;
+}
+.btn-perigo:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--perigo) 14%, transparent);
+  border-color: color-mix(in srgb, var(--perigo) 40%, transparent);
+}
+.btn-icone.ativo {
+  background: var(--destaque-suave);
+  border-color: color-mix(in srgb, var(--destaque) 45%, transparent);
+  color: var(--destaque-forte);
+}
+
+/* campos */
+input,
+textarea,
+select {
+  background: var(--campo);
+  border-color: var(--borda);
+  border-radius: 8px;
+}
+input:hover,
+textarea:hover,
+select:hover {
+  border-color: var(--borda-forte);
+}
+input:focus,
+textarea:focus,
+select:focus,
+.btn:focus-visible,
+.btn-icone:focus-visible {
+  outline: none;
+  border-color: var(--destaque);
+  box-shadow: 0 0 0 3px var(--destaque-suave);
+}
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"] {
+  accent-color: var(--destaque);
+}
+input[type="range"] {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* barra de progresso com brilho */
+.progresso-cheio {
+  background: linear-gradient(90deg, var(--destaque), var(--destaque-forte));
+}
+
+/* editor: área do vídeo como num editor de vídeo */
+.player {
+  border-radius: 12px;
+  border: 1px solid var(--borda);
+  box-shadow: var(--sombra);
+}
+.barra-controles {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 6px 8px;
+}
+.tempo-atual {
+  background: var(--campo);
+  border: 1px solid var(--borda);
+  border-radius: 7px;
+  padding: 4px 9px;
+  font-size: 13px;
+  color: var(--texto);
+}
+.timeline-controles {
+  background: var(--superficie);
+}
+
+/* abas do painel lateral como controle segmentado */
+.abas {
+  gap: 2px;
+  padding: 6px;
+  background: var(--superficie);
+}
+.abas button {
+  border-radius: 8px;
+  border-bottom: none;
+  padding: 7px 6px;
+  transition: background 0.12s, color 0.12s;
+}
+.abas button:hover {
+  color: var(--texto);
+  background: var(--superficie-2);
+}
+.abas button.ativo {
+  background: var(--destaque-suave);
+  color: var(--destaque-forte);
+}
+:root[data-theme="light"] .abas button.ativo {
+  color: var(--destaque);
+}
+.abas-janela button.ativo {
+  background: var(--superficie-3);
+  box-shadow: none;
+}
+:root[data-theme="light"] .abas-janela button.ativo {
+  background: var(--superficie);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.abas-ajustes a.ativo {
+  color: var(--destaque-forte);
+}
+:root[data-theme="light"] .abas-ajustes a.ativo {
+  color: var(--destaque);
+}
+
+/* listas: cortes, momentos e transcrição */
+.corte,
+.momento {
+  background: var(--superficie-2);
+  border-color: var(--borda);
+  border-radius: 10px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.corte:hover,
+.momento:hover {
+  border-color: var(--borda-forte);
+}
+.segmento-atual {
+  background: var(--destaque-suave);
+}
+kbd {
+  background: var(--superficie-2);
+  border-color: var(--borda-forte);
+}
+
+/* cartões de projeto */
+.cartao.projeto {
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.cartao.projeto:hover {
+  transform: translateY(-2px);
+  border-color: var(--borda-forte);
+}
+.capa-duracao {
+  backdrop-filter: blur(4px);
+}
+
+/* avisos */
+.aviso {
+  background: var(--superficie-2);
+  border-radius: 10px;
+  box-shadow: var(--sombra-modal);
+}

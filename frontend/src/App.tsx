@@ -28,7 +28,7 @@ function lerRota(): Rota {
 function temaAtual(): "light" | "dark" {
   const d = document.documentElement.dataset.theme;
   if (d === "light" || d === "dark") return d;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "dark";
 }
 
 interface Aviso {

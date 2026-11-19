@@ -72,6 +72,11 @@ export default function Timeline(p: Props) {
     for (const v of p.ondas?.picos ?? []) if (v > m) m = v;
     return m;
   }, [p.ondas]);
+  // "alto" = os ~8% de trechos mais altos desta live (não um valor fixo: cada live tem um volume)
+  const limiarForte = useMemo(() => {
+    const v = (p.ondas?.picos ?? []).filter((x) => x > 0).sort((a, b) => a - b);
+    return v.length ? Math.max(v[Math.floor(v.length * 0.92)], picoMax * 0.35) : Infinity;
+  }, [p.ondas, picoMax]);
 
   const cortesVisiveis = useMemo(
     () => (provisorio ? p.cortes.map((c) => (c.id === provisorio.id ? { ...c, ...provisorio } : c)) : p.cortes),
@@ -224,15 +229,21 @@ export default function Timeline(p: Props) {
     const alturaOnda = (ALTURA - Y_ONDA) / 2 - 3;
     if (p.ondas) {
       const { taxa, picos } = p.ondas;
-      const forte = picoMax * 0.6;
       for (let px = 0; px < w; px++) {
         const t1 = vista.a + px / pps;
         const i1 = Math.floor(t1 * taxa);
         const i2 = Math.max(i1 + 1, Math.floor((t1 + 1 / pps) * taxa));
         let v = 0;
-        for (let i = i1; i < i2 && i < picos.length; i++) if (picos[i] > v) v = picos[i];
+        let soma = 0;
+        let n = 0;
+        for (let i = i1; i < i2 && i < picos.length; i++) {
+          if (picos[i] > v) v = picos[i];
+          soma += picos[i];
+          n++;
+        }
         const h = Math.max(1, (v / picoMax) * alturaOnda);
-        c.fillStyle = v >= forte ? cores["--tl-onda-forte"] : cores["--tl-onda"];
+        // a cor usa a média do pixel: com zoom afastado o máximo de vários valores pintaria tudo de laranja
+        c.fillStyle = n && soma / n >= limiarForte ? cores["--tl-onda-forte"] : cores["--tl-onda"];
         c.fillRect(px, meio - h, 1, h * 2);
       }
     }
@@ -296,7 +307,7 @@ export default function Timeline(p: Props) {
       c.stroke();
     }
     c.lineWidth = 1;
-  }, [largura, vista, p.ondas, cortesVisiveis, p.selecao, p.corteAtivo, provisorio, cores, span, picoMax, sprite,
+  }, [largura, vista, p.ondas, cortesVisiveis, p.selecao, p.corteAtivo, provisorio, cores, span, picoMax, limiarForte, sprite,
     p.miniaturas]);
 
   // Cursor de reprodução e linha do mouse numa camada própria, redesenhada a cada quadro sem tocar no resto

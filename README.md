@@ -5,8 +5,10 @@ Site local para cortar lives com legendas e formatos pré-definidos. Roda no seu
 ## Estado atual
 
 As 6 partes estão prontas. A rodada de melhorias está em andamento: desempenho, fluxo (padrão dos cortes,
-vários momentos, exportar tudo, modo automático) e timeline já foram feitos; faltam o visual estilo estúdio,
-o programa de desktop (Tauri) e este README completo.
+vários momentos, exportar tudo, modo automático), timeline e o visual escuro estilo estúdio já foram feitos;
+faltam o programa de desktop (Tauri) e este README completo.
+
+O visual abre no tema escuro; o botão de sol/lua no canto troca para o claro (a escolha fica salva).
 
 - [x] Importar live por arquivo do PC ou link (Twitch, YouTube, Kick)
 - [x] Preview leve em 480p + forma de onda do áudio
