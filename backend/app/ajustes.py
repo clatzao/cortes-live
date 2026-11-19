@@ -10,11 +10,13 @@ _lock = threading.Lock()
 MODELOS_WHISPER = ["auto", "large-v3", "large-v3-turbo", "medium", "small", "base"]
 DISPOSITIVOS = ["auto", "cuda", "cpu"]
 QUALIDADES = ["1080", "720", "melhor"]  # altura máxima do vídeo baixado por link
+RESOLUCOES = ["1080", "1440", "2160"]   # lado menor do vídeo exportado (2160 = 4K)
 
 PADRAO = {
     "whisper_modelo": "auto",
     "whisper_dispositivo": "auto",
     "download_qualidade": "1080",  # 1080p basta para os cortes e baixa bem mais rápido que 4K
+    "export_resolucao": "1080",    # 1440 ou 2160 (4K) só valem a pena com vídeo original nessa qualidade
     # Momentos virais
     "gemini_chave": "",          # chave da API do Google AI Studio (fica só neste PC)
     "gemini_modelo": "auto",
@@ -58,6 +60,8 @@ def salvar(novos: dict) -> dict:
         atual["whisper_dispositivo"] = novos["whisper_dispositivo"]
     if novos.get("download_qualidade") in QUALIDADES:
         atual["download_qualidade"] = novos["download_qualidade"]
+    if novos.get("export_resolucao") in RESOLUCOES:
+        atual["export_resolucao"] = novos["export_resolucao"]
     if "gemini_chave" in novos and novos["gemini_chave"] is not None:
         atual["gemini_chave"] = str(novos["gemini_chave"]).strip()
     if isinstance(novos.get("gemini_modelo"), str) and novos["gemini_modelo"].strip():

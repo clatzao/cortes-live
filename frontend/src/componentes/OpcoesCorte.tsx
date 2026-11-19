@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Crosshair, Lock, RotateCcw } from "lucide-react";
 import { api, avisar, Corte, erroTexto, focoEm, Formato, Marca, Projeto, Recursos, trilhaDoCorte } from "../api";
 import SeletorSegmentado from "./ui/SeletorSegmentado";
+import BrollCorte from "./BrollCorte";
+import { BrollItem } from "../api";
 import { formatar } from "../tempo";
 import LayoutFacecam from "./LayoutFacecam";
 
@@ -31,6 +33,11 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
   const [cropX, setCropX] = useState(corte.crop_x ?? 0.5);
   const [enq, setEnq] = useState<"fixo" | "auto">(corte.enquadramento ?? "fixo");
   const [corteAtual, setCorteAtual] = useState(corte);
+  const [hook, setHook] = useState<number | null>(corte.gancho_midia_id ?? null);
+  const [brolls, setBrolls] = useState<BrollItem[]>([]);
+  useEffect(() => {
+    api.brolls(corte.id).then(setBrolls).catch(() => {});
+  }, [corte.id]);
   const trilha = trilhaDoCorte(corteAtual);
   const [gancho, setGancho] = useState(corte.gancho ?? "");
   const [recursos, setRecursos] = useState<Recursos>(corte.recursos_efetivos);
@@ -115,7 +122,9 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
       return false;
     }
     try {
-      const c = await api.editarCorte(corte.id, { formatos: sel, crop_x: cropX, enquadramento: enq, gancho: gancho.trim() || null, recursos });
+      const c = await api.editarCorte(corte.id, { formatos: sel, crop_x: cropX, enquadramento: enq,
+        gancho_midia_id: hook ?? 0, gancho: gancho.trim() || null, recursos });
+      setBrolls(await api.salvarBrolls(corte.id, brolls));
       setCorteAtual(c);
       onAlterado(c);
       setSujo(false);
@@ -227,6 +236,9 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
                 )}
               </div>
             )}
+
+            <BrollCorte corteId={corte.id} duracao={corte.fim - corte.inicio} hook={hook}
+              onHook={(h) => (setHook(h), setSujo(true))} brolls={brolls} onBrolls={(b) => (setBrolls(b), setSujo(true))} />
 
             <h3>Gancho (título no topo)</h3>
             <input

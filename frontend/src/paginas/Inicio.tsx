@@ -121,7 +121,7 @@ export default function Inicio() {
       <section className="cartao importar">
         <h1>Importar live</h1>
         <p className="sutil">
-          Cole o link (Twitch, YouTube, Kick) ou escolha um arquivo do PC. Use apenas lives suas ou com permissão.
+          Cole o link (Twitch, YouTube, Kick ou um arquivo do Google Drive compartilhado) ou escolha um arquivo do PC. Use apenas lives suas ou com permissão.
         </p>
         <form onSubmit={importar} className="linha-importar">
           <input

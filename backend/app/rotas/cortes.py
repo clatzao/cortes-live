@@ -33,6 +33,7 @@ class EdicaoCorte(BaseModel):
     gancho: str | None = None
     crop_x: float | None = Field(default=None, ge=0, le=1)
     enquadramento: Literal["fixo", "auto"] | None = None
+    gancho_midia_id: int | None = None  # 0 = sem hook em vídeo
 
 
 class ListaTimestamps(BaseModel):
@@ -95,6 +96,11 @@ def editar_corte(corte_id: int, dados: EdicaoCorte):
         gancho = (dados.gancho or "").strip()[:200] or None
     crop_x = c["crop_x"] if dados.crop_x is None else round(dados.crop_x, 4)
     enq = dados.enquadramento or c["enquadramento"]
+    if dados.gancho_midia_id is not None:
+        hook = dados.gancho_midia_id or None
+        if hook and not db.um("SELECT id FROM midias WHERE id=? AND tipo='gancho'", (hook,)):
+            raise HTTPException(400, "Hook em vídeo não encontrado na biblioteca de mídias.")
+        db.executar("UPDATE cortes SET gancho_midia_id=? WHERE id=?", (hook, corte_id))
     db.executar("UPDATE cortes SET inicio=?, fim=?, nome=?, estilo=?, com_legenda=?, formatos=?, recursos=?, "
                 "gancho=?, crop_x=?, enquadramento=? WHERE id=?",
                 (inicio, fim, nome, estilo, com_legenda, fmts, recursos, gancho, crop_x, enq, corte_id))

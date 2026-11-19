@@ -254,10 +254,23 @@ def exportar(ctx: Contexto) -> str:
         srt = temporaria / "legenda.srt"
         if srt.exists():
             shutil.copyfile(srt, destino.with_suffix(".srt"))
+        registrar_exportacao(c, p, fmt, destino, ctx.id)
     finally:
         media.apagar_arquivo(parcial)
         shutil.rmtree(temporaria, ignore_errors=True)
     return str(destino)
+
+
+def registrar_exportacao(c: dict, p: dict, fmt: str, destino: Path, job_id: int) -> None:
+    """Guarda o arquivo na Biblioteca (exportar de novo o mesmo corte/formato só atualiza a linha)."""
+    db.executar(
+        "INSERT INTO exportacoes (corte_id, projeto_id, projeto_nome, corte_nome, formato, resolucao, caminho, "
+        "duracao_s, tamanho_bytes, job_id, criado_em) VALUES (?,?,?,?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(caminho) DO UPDATE SET corte_id=excluded.corte_id, projeto_nome=excluded.projeto_nome, "
+        "corte_nome=excluded.corte_nome, resolucao=excluded.resolucao, duracao_s=excluded.duracao_s, "
+        "tamanho_bytes=excluded.tamanho_bytes, job_id=excluded.job_id, criado_em=excluded.criado_em",
+        (c["id"], p["id"], p["nome"], c["nome"], fmt, ajustes.ler()["export_resolucao"], str(destino),
+         round(c["fim"] - c["inicio"], 2), destino.stat().st_size, job_id, db.agora()))
 
 
 def layout_do_projeto(p: dict, m: dict | None = None) -> dict:
@@ -298,13 +311,14 @@ def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | N
     rapida = previa and proxy.is_file()
     info = media.analisar_rapido(p["caminho_original"])
     layout = marca.validar_layout(sobrescrever["layout"]) if sobrescrever.get("layout") else layout_do_projeto(p, m)
-    ow, oh = formatos.tamanho_saida(fmt, p["largura"], p["altura"])
+    resolucao = 1080 if previa else int(ajustes.ler()["export_resolucao"])  # prévia sempre leve
+    ow, oh = formatos.tamanho_saida(fmt, p["largura"], p["altura"], resolucao)
     duracao = c["fim"] - c["inicio"]
     mt = formatos.Montagem(
         origem=str(proxy) if rapida else p["caminho_original"], fonte_reduzida=rapida, inicio=c["inicio"] + (previa_t or 0), duracao=duracao, fmt=fmt,
         largura=p["largura"], altura=p["altura"], fps=p["fps"] or 30, tem_audio=info["tem_audio"],
         crop_x=float(sobrescrever.get("crop_x", c["crop_x"] if c.get("crop_x") is not None else 0.5)),
-        layout=layout,
+        layout=layout, resolucao=resolucao,
     )
     # Enquadramento automático: o recorte segue a trilha calculada (prévia: o ponto da trilha naquele instante).
     if sobrescrever.get("enquadramento", c.get("enquadramento")) == "auto" and fmt in formatos.USA_RECORTE:
@@ -365,6 +379,16 @@ def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | N
             if rec[k]:
                 ix = media.analisar(m[k]["arquivo"])
                 setattr(mt, k, formatos.Extra(m[k]["arquivo"], ix["duracao"], ix["tem_audio"]))
+        hook_id = sobrescrever.get("gancho_midia_id", c.get("gancho_midia_id"))
+        hook = db.um("SELECT * FROM midias WHERE id=?", (hook_id,)) if hook_id else None
+        if hook and Path(hook["caminho"]).is_file():
+            mt.hook = formatos.Extra(hook["caminho"], hook["duracao_s"] or 0, bool(hook["tem_audio"]))
+    mt.previa_t = previa_t or 0.0
+    if c.get("id"):
+        for b in db.listar("SELECT b.*, m.caminho FROM corte_brolls b JOIN midias m ON m.id = b.midia_id "
+                           "WHERE b.corte_id=? ORDER BY b.inicio_s", (c["id"],)):
+            if Path(b["caminho"]).is_file() and b["inicio_s"] < duracao:
+                mt.brolls.append((b["caminho"], b["inicio_s"], min(b["fim_s"], duracao), b["modo"]))
     return mt
 
 

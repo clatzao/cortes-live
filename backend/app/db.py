@@ -140,7 +140,60 @@ _conn.commit()
 _adicionar_coluna("projetos", "live_id", "INTEGER REFERENCES lives(id) ON DELETE SET NULL")
 _adicionar_coluna("cortes", "origem", "TEXT NOT NULL DEFAULT 'manual'")  # manual, sugestao ou live
 _adicionar_coluna("cortes", "enquadramento", "TEXT NOT NULL DEFAULT 'fixo'")  # fixo (crop_x) ou auto (segue rosto)
-_adicionar_coluna("cortes", "trilha_foco", "TEXT")  # JSON {inicio, fim, pontos: [[t, x]...], editada}
+_adicionar_coluna("cortes", "trilha_foco", "TEXT")
+
+# Arquivos exportados (Biblioteca e, depois, publicação nas redes). O arquivo sobrevive ao corte apagado.
+_conn.executescript(
+    """
+CREATE TABLE IF NOT EXISTS exportacoes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    corte_id INTEGER REFERENCES cortes(id) ON DELETE SET NULL,
+    projeto_id INTEGER REFERENCES projetos(id) ON DELETE SET NULL,
+    projeto_nome TEXT NOT NULL DEFAULT '',
+    corte_nome TEXT NOT NULL DEFAULT '',
+    formato TEXT NOT NULL,
+    resolucao TEXT NOT NULL DEFAULT '1080',
+    idioma TEXT,
+    caminho TEXT NOT NULL UNIQUE,
+    duracao_s REAL NOT NULL,
+    tamanho_bytes INTEGER NOT NULL,
+    job_id INTEGER,
+    criado_em REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS exportacoes_corte ON exportacoes (corte_id);
+CREATE INDEX IF NOT EXISTS exportacoes_projeto ON exportacoes (projeto_id);
+CREATE INDEX IF NOT EXISTS exportacoes_data ON exportacoes (criado_em DESC);
+
+-- Mídias do próprio usuário: hooks (vídeo antes do corte), B-roll (vídeo por cima de um trecho)
+CREATE TABLE IF NOT EXISTS midias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT NOT NULL CHECK (tipo IN ('gancho','broll')),
+    nome TEXT NOT NULL,
+    caminho TEXT NOT NULL UNIQUE,
+    duracao_s REAL,
+    largura INTEGER,
+    altura INTEGER,
+    tem_audio INTEGER NOT NULL DEFAULT 0,
+    tags TEXT NOT NULL DEFAULT '[]',
+    criado_em REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS midias_tipo ON midias (tipo);
+CREATE TABLE IF NOT EXISTS corte_brolls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    corte_id INTEGER NOT NULL REFERENCES cortes(id) ON DELETE CASCADE,
+    midia_id INTEGER NOT NULL REFERENCES midias(id) ON DELETE CASCADE,
+    inicio_s REAL NOT NULL,
+    fim_s REAL NOT NULL,
+    modo TEXT NOT NULL DEFAULT 'tela_cheia' CHECK (modo IN ('tela_cheia','metade')),
+    origem TEXT NOT NULL DEFAULT 'manual' CHECK (origem IN ('manual','auto')),
+    CHECK (fim_s > inicio_s)
+);
+CREATE INDEX IF NOT EXISTS corte_brolls_corte ON corte_brolls (corte_id);
+CREATE INDEX IF NOT EXISTS corte_brolls_midia ON corte_brolls (midia_id);
+"""
+)
+_conn.commit()
+_adicionar_coluna("cortes", "gancho_midia_id", "INTEGER REFERENCES midias(id) ON DELETE SET NULL")  # JSON {inicio, fim, pontos: [[t, x]...], editada}
 
 
 def executar(sql: str, params: tuple = ()) -> int:

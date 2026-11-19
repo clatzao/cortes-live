@@ -26,6 +26,7 @@ class Ajustes(BaseModel):
     whisper_modelo: str | None = None
     whisper_dispositivo: str | None = None
     download_qualidade: str | None = None
+    export_resolucao: str | None = None
     gemini_chave: str | None = None   # "" apaga a chave
     gemini_modelo: str | None = None
     viral_min: int | None = None
@@ -41,7 +42,8 @@ class Ajustes(BaseModel):
 def ver_ajustes():
     return {**ajustes.publico(), "opcoes": {"whisper_modelo": ajustes.MODELOS_WHISPER,
                                             "whisper_dispositivo": ajustes.DISPOSITIVOS,
-                                            "download_qualidade": ajustes.QUALIDADES}}
+                                            "download_qualidade": ajustes.QUALIDADES,
+                                            "export_resolucao": ajustes.RESOLUCOES}}
 
 
 @router.put("/api/ajustes")

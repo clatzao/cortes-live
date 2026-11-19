@@ -21,9 +21,13 @@ def _par(v: float) -> int:
     return max(2, int(round(v)) // 2 * 2)
 
 
-def tamanho_saida(fmt: str, w: int, h: int) -> tuple[int, int]:
+def tamanho_saida(fmt: str, w: int, h: int, resolucao: int = 1080) -> tuple[int, int]:
+    """Tamanho do vídeo final. resolucao = lado menor (1080, 1440 ou 2160); "Original" mantém o do vídeo."""
     f = FORMATOS[fmt]
-    return (_par(w), _par(h)) if f["w"] is None else (f["w"], f["h"])
+    if f["w"] is None:
+        return _par(w), _par(h)
+    k = resolucao / 1080
+    return _par(f["w"] * k), _par(f["h"] * k)
 
 
 def posicao_legenda(fmt: str, layout: dict, estilo: dict) -> dict:
@@ -61,9 +65,9 @@ def _caminho_filtro(p: Path) -> str:
 
 
 def filtro_video(fmt: str, w: int, h: int, crop_x: float, layout: dict, ent: str, sai: str,
-                 foco: Path | None = None) -> str:
+                 foco: Path | None = None, resolucao: int = 1080) -> str:
     """foco: arquivo do sendcmd que move o recorte ao longo do tempo (enquadramento automático)."""
-    ow, oh = tamanho_saida(fmt, w, h)
+    ow, oh = tamanho_saida(fmt, w, h, resolucao)
     if fmt in USA_RECORTE:
         a = ow / oh
         cw = _par(min(w, h * a))
@@ -116,6 +120,7 @@ class Montagem:
     tem_audio: bool
     crop_x: float = 0.5
     foco: Path | None = None  # sendcmd do enquadramento automático (só nos formatos com recorte)
+    resolucao: int = 1080     # lado menor do vídeo final (exportação em 1440p/4K)
     layout: dict = field(default_factory=dict)
     legenda: tuple[Path, int] | None = None        # (lista ffconcat ou PNG único, y)
     gancho: tuple[Path, int, float] | None = None   # (PNG, y, duração; 0 = corte todo)
@@ -123,12 +128,16 @@ class Montagem:
     musica: tuple[str, float, bool] | None = None   # (arquivo, volume, abaixar na fala)
     intro: Extra | None = None
     outro: Extra | None = None
+    hook: Extra | None = None     # vídeo de gancho antes de tudo (biblioteca de mídias)
+    # B-roll: (arquivo, início, fim, modo) com tempos relativos ao corte; modo tela_cheia ou metade
+    brolls: list[tuple[str, float, float, str]] = field(default_factory=list)
+    previa_t: float = 0.0         # instante da prévia (para mostrar o B-roll que estiver no ar)
     fonte_reduzida: bool = False  # prévia lendo o proxy: escala de volta para largura x altura
 
 
 def comando(m: Montagem, video_args: list[str], destino: str, previa: bool = False) -> tuple[list[str], float]:
     """Argumentos do FFmpeg (sem o executável). Com previa=True gera um único quadro JPEG em stdout."""
-    ow, oh = tamanho_saida(m.fmt, m.largura, m.altura)
+    ow, oh = tamanho_saida(m.fmt, m.largura, m.altura, m.resolucao)
     fps = min(60.0, m.fps or 30.0)
     args: list[str] = []
     filtros: list[str] = []
@@ -144,8 +153,24 @@ def comando(m: Montagem, video_args: list[str], destino: str, previa: bool = Fal
     principal = entrada("-ss", f"{m.inicio:.3f}", "-t", f"{dur:.3f}", "-i", m.origem)
     ent = f"[{principal}:v]" + (f"scale={m.largura}:{m.altura}," if m.fonte_reduzida else "")
     filtros.append(filtro_video(m.fmt, m.largura, m.altura, m.crop_x, m.layout, ent, "[v0]",
-                                None if previa else m.foco))
+                                None if previa else m.foco, m.resolucao))
     atual = "[v0]"
+
+    # B-roll por baixo da legenda/gancho/logo: cobre a tela (ou a metade de cima) no intervalo marcado
+    for k, (arq, a, b, modo) in enumerate(m.brolls):
+        if previa and not (a <= m.previa_t < b):
+            continue
+        bw, bh = (ow, oh) if modo == "tela_cheia" else (ow, _par(oh / 2))
+        cobrir = f"scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},setsar=1"
+        if previa:
+            i = entrada("-ss", f"{m.previa_t - a:.3f}", "-i", arq)
+            filtros.append(f"[{i}:v]{cobrir},format=yuva420p[br{k}]")
+            filtros.append(f"{atual}[br{k}]overlay=0:0:eof_action=repeat[vb{k}]")
+        else:
+            i = entrada("-stream_loop", "-1", "-t", f"{b - a:.3f}", "-i", arq)
+            filtros.append(f"[{i}:v]{cobrir},fps={fps:g},setpts=PTS-STARTPTS+{a:.3f}/TB[br{k}]")
+            filtros.append(f"{atual}[br{k}]overlay=0:0:eof_action=pass:enable='between(t,{a:.3f},{b:.3f})'[vb{k}]")
+        atual = f"[vb{k}]"
 
     def sobrepor(idx: int, x: int, y: int, rotulo: str, rgba: bool = True) -> None:
         nonlocal atual
@@ -224,6 +249,8 @@ def comando(m: Montagem, video_args: list[str], destino: str, previa: bool = Fal
         partes_a.append(f"[{nome}a]")
         total += extra.duracao
 
+    if m.hook:
+        preparar_extra(m.hook, "hook")
     if m.intro:
         preparar_extra(m.intro, "intro")
     partes_v.append("[vm]")

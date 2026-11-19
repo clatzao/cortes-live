@@ -185,6 +185,23 @@ export default function Configuracoes({ hw, onHw }: { hw: Hardware | null; onHw:
                 <p className="sutil">
                   Até 1080p é o recomendado: os cortes saem em 1080p e o download fica bem mais rápido.
                 </p>
+                <label>
+                  Resolução dos cortes exportados
+                  <select
+                    value={ajustes.export_resolucao}
+                    onChange={(e) => salvar({ export_resolucao: e.target.value })}
+                  >
+                    {ajustes.opcoes.export_resolucao.map((r) => (
+                      <option key={r} value={r}>
+                        {r === "2160" ? "4K (2160p)" : `${r}p`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="sutil">
+                  1440p e 4K só ganham detalhe se o vídeo original tiver essa qualidade (baixe com "Melhor
+                  disponível"). O arquivo fica maior e a exportação demora mais.
+                </p>
               </div>
             )}
           </section>

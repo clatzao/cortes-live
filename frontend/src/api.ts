@@ -55,6 +55,7 @@ export interface Transcricao {
 }
 
 export interface Ajustes {
+  export_resolucao: string;
   whisper_modelo: string;
   whisper_dispositivo: string;
   gemini_modelo: string;
@@ -68,7 +69,7 @@ export interface Ajustes {
   legenda_padrao: boolean;
   auto_cortes: boolean;
   download_qualidade: string;
-  opcoes: { whisper_modelo: string[]; whisper_dispositivo: string[]; download_qualidade: string[] };
+  opcoes: { whisper_modelo: string[]; whisper_dispositivo: string[]; download_qualidade: string[]; export_resolucao: string[] };
 }
 
 export interface Sugestao {
@@ -100,6 +101,7 @@ export interface Corte {
   crop_x: number;
   enquadramento: "fixo" | "auto";
   trilha_foco: string | null;
+  gancho_midia_id: number | null;
   gancho: string | null;
   recursos: string | null;
   formatos_efetivos: string[];
@@ -272,6 +274,48 @@ export interface CorteLive {
   exportavel: boolean;
 }
 
+export type TipoMidia = "gancho" | "broll";
+
+export interface Midia {
+  id: number;
+  tipo: TipoMidia;
+  nome: string;
+  caminho: string;
+  duracao_s: number | null;
+  largura: number | null;
+  altura: number | null;
+  tem_audio: number;
+  tags: string[];
+  existe: boolean;
+}
+
+export interface BrollItem {
+  midia_id: number;
+  inicio_s: number;
+  fim_s: number;
+  modo: "tela_cheia" | "metade";
+  origem: "manual" | "auto";
+  nome?: string;
+  palavra?: string;
+}
+
+export interface ItemBiblioteca {
+  id: number;
+  corte_id: number | null;
+  projeto_id: number | null;
+  projeto_nome: string;
+  corte_nome: string;
+  formato: string;
+  formato_nome: string;
+  resolucao: string;
+  idioma: string | null;
+  caminho: string;
+  duracao_s: number;
+  tamanho_bytes: number;
+  criado_em: number;
+  existe: boolean;
+}
+
 export interface LiveDetalhe extends Live {
   disco_livre_gb: number;
   cortes: CorteLive[];
@@ -375,7 +419,7 @@ export const api = {
     req<{ criados: Corte[]; invalidas: string[] }>(`/api/projetos/${projetoId}/cortes/lote`, "POST", { texto }),
   editarCorte: (
     id: number,
-    dados: Partial<Pick<Corte, "inicio" | "fim" | "nome" | "estilo" | "crop_x" | "enquadramento">> & {
+    dados: Partial<Pick<Corte, "inicio" | "fim" | "nome" | "estilo" | "crop_x" | "enquadramento" | "gancho_midia_id">> & {
       com_legenda?: boolean;
       formatos?: string[] | null;
       recursos?: Recursos | null;
@@ -418,6 +462,27 @@ export const api = {
   abrirSaida: (id: number) => req<{ ok: boolean }>(`/api/fila/${id}/abrir`, "POST"),
   abrirExportados: () => req<{ ok: boolean }>("/api/abrir-exportados", "POST"),
 
+  biblioteca: (f: { busca?: string; formato?: string; projeto?: number }) => {
+    const q = new URLSearchParams();
+    if (f.busca?.trim()) q.set("busca", f.busca.trim());
+    if (f.formato) q.set("formato", f.formato);
+    if (f.projeto !== undefined) q.set("projeto", String(f.projeto));
+    return req<ItemBiblioteca[]>(`/api/biblioteca?${q}`);
+  },
+  urlVideoBiblioteca: (id: number) => `/api/biblioteca/${id}/video`,
+  abrirNaBiblioteca: (id: number) => req<{ ok: boolean }>(`/api/biblioteca/${id}/abrir`, "POST"),
+  tirarDaBiblioteca: (id: number) => req<{ ok: boolean }>(`/api/biblioteca/${id}`, "DELETE"),
+  midias: (tipo?: TipoMidia) => req<Midia[]>(`/api/midias${tipo ? `?tipo=${tipo}` : ""}`),
+  adicionarMidias: (tipo: TipoMidia, caminhos: string[]) =>
+    req<{ criadas: Midia[]; erros: string[] }>("/api/midias", "POST", { tipo, caminhos }),
+  editarMidia: (id: number, dados: { nome?: string; tags?: string[] }) => req<Midia>(`/api/midias/${id}`, "PATCH", dados),
+  removerMidia: (id: number) => req<{ ok: boolean }>(`/api/midias/${id}`, "DELETE"),
+  urlQuadroMidia: (id: number) => `/api/midias/${id}/quadro`,
+  brolls: (corteId: number) => req<BrollItem[]>(`/api/cortes/${corteId}/brolls`),
+  salvarBrolls: (corteId: number, lista: BrollItem[]) =>
+    req<BrollItem[]>(`/api/cortes/${corteId}/brolls`, "PUT",
+      lista.map(({ midia_id, inicio_s, fim_s, modo, origem }) => ({ midia_id, inicio_s, fim_s, modo, origem }))),
+  sugerirBrolls: (corteId: number) => req<BrollItem[]>(`/api/cortes/${corteId}/brolls/sugerir`, "POST"),
   lives: () => req<Live[]>("/api/lives"),
   live: (id: number) => req<LiveDetalhe>(`/api/lives/${id}`),
   criarLive: (entrada: string, idioma: Idioma) => req<Live>("/api/lives", "POST", { entrada, idioma }),

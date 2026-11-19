@@ -1,17 +1,19 @@
-import { Captions, Cpu, Palette, SlidersHorizontal } from "lucide-react";
+import { Captions, Clapperboard, Cpu, Palette, SlidersHorizontal } from "lucide-react";
 import { Hardware } from "../api";
 import Configuracoes from "./Configuracoes";
 import Legendas from "./Legendas";
 import MarcaPagina from "./MarcaPagina";
+import Midias from "./Midias";
 import Predefinicao from "./Predefinicao";
 
-export type AbaAjustes = "padrao" | "legendas" | "marca" | "sistema";
+export type AbaAjustes = "padrao" | "legendas" | "marca" | "midias" | "sistema";
 
 const ABAS: { id: AbaAjustes; nome: string; dica: string; Icone: typeof Captions }[] = [
   { id: "padrao", nome: "Padrão dos cortes", dica: "Como todo corte novo nasce: legenda, formatos, extras e momentos",
     Icone: SlidersHorizontal },
   { id: "legendas", nome: "Legendas", dica: "Estilos das legendas, emojis e palavras-chave", Icone: Captions },
   { id: "marca", nome: "Marca do canal", dica: "Logo, gancho, intro/outro e música", Icone: Palette },
+  { id: "midias", nome: "Mídias", dica: "Seus vídeos de hook e B-roll", Icone: Clapperboard },
   { id: "sistema", nome: "IA e hardware", dica: "Placa de vídeo, transcrição e Gemini", Icone: Cpu },
 ];
 
@@ -31,6 +33,7 @@ export default function Ajustes({ aba, hw, onHw }: { aba: AbaAjustes; hw: Hardwa
       {aba === "padrao" && <Predefinicao />}
       {aba === "legendas" && <Legendas />}
       {aba === "marca" && <MarcaPagina />}
+      {aba === "midias" && <Midias />}
       {aba === "sistema" && <Configuracoes hw={hw} onHw={onHw} />}
     </div>
   );
