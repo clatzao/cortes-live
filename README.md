@@ -33,7 +33,25 @@ O visual abre no tema escuro; o botão de sol/lua no canto troca para o claro (a
       sugeridos pelo Gemini, editor com camadas (texto, emoji, imagem, seta, círculo, retângulo, ajustes de
       imagem, contorno, desfazer) e exportação em PNG
 
-## Instalação (Windows 10/11)
+## Instalação fácil: programa de desktop (Windows 10/11)
+
+1. Baixe o **`Cortes Live_<versão>_x64-setup.exe`** em
+   [Releases](https://github.com/clatzao/cortes-live/releases) e abra. Ele instala só para o seu usuário
+   (não pede administrador) e cria o atalho no menu Iniciar e na área de trabalho.
+   Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**
+   (o instalador não é assinado digitalmente).
+2. Abra o **Cortes Live**. Na **primeira vez** ele prepara tudo sozinho, com o progresso na tela:
+   baixa o FFmpeg (~200 MB, se o PC ainda não tiver), o Python e as bibliotecas (~400 MB; com placa NVIDIA,
+   mais ~1,5 GB de CUDA). Depois disso abre em poucos segundos.
+3. O programa abre na própria janela. Fechar a janela encerra tudo (inclusive exportações em andamento).
+
+Os projetos, ajustes e modelos de IA do programa instalado ficam em `%LOCALAPPDATA%\br.cortes.live`; os
+cortes prontos vão para `Vídeos\Cortes Live`. Para atualizar, instale a versão nova por cima.
+Para desinstalar: **Configurações do Windows → Aplicativos → Cortes Live**.
+
+## Instalação pelo código (sem o instalador)
+
+Use este caminho se preferir rodar pelo navegador ou não quiser o instalador.
 
 1. **Baixe o projeto** (o repositório é público, não precisa de login):
    - **Sem Git:** em https://github.com/clatzao/cortes-live clique em **Code → Download ZIP** e extraia
@@ -178,5 +196,18 @@ npm install
 npm run dev     # http://localhost:5173 (repassa /api para a porta 8765)
 npm run build   # gera frontend/dist, servido pelo backend
 ```
+
+Programa de desktop (Tauri, em `desktop/`; precisa de Rust e das ferramentas de build C++ do Visual Studio):
+
+```
+cd desktop
+npm install
+npm run build   # gera desktop/src-tauri/target/release/bundle/nsis/Cortes Live_<versão>_x64-setup.exe
+```
+
+O app em Rust (`desktop/src-tauri/src/main.rs`) mostra a tela de abertura, baixa o FFmpeg, instala o Python e
+as bibliotecas com o `uv` embutido, liga o motor numa porta livre e o encerra junto com a janela (job object
+do Windows). A compilação ocupa ~2-3 GB em `desktop/src-tauri/target`; `cargo clean` dentro de
+`desktop/src-tauri` libera o espaço.
 
 Use apenas lives suas ou com permissão do criador.

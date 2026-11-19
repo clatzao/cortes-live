@@ -6,7 +6,8 @@ from pathlib import Path
 
 # Pasta raiz do projeto: cortes-live/
 RAIZ = Path(__file__).resolve().parents[2]
-DADOS = RAIZ / "dados"
+# CORTES_DADOS: pasta de dados fora do programa (o app de desktop usa a pasta do usuário)
+DADOS = Path(os.environ["CORTES_DADOS"]) if os.environ.get("CORTES_DADOS") else RAIZ / "dados"
 PROJETOS = DADOS / "projetos"
 
 
@@ -47,9 +48,11 @@ SEM_JANELA = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
 def _achar(nome: str) -> str | None:
-    """Procura primeiro um FFmpeg embutido em cortes-live/ferramentas, depois no PATH."""
+    """Procura um FFmpeg embutido (CORTES_FERRAMENTAS ou cortes-live/ferramentas), depois no PATH."""
     exe = nome + (".exe" if os.name == "nt" else "")
-    for local in (RAIZ / "ferramentas" / "ffmpeg" / "bin" / exe, RAIZ / "ferramentas" / exe):
+    pastas = [Path(os.environ["CORTES_FERRAMENTAS"])] if os.environ.get("CORTES_FERRAMENTAS") else []
+    pastas.append(RAIZ / "ferramentas")
+    for local in [x for pasta in pastas for x in (pasta / "ffmpeg" / "bin" / exe, pasta / exe)]:
         if local.exists():
             return str(local)
     return shutil.which(nome)

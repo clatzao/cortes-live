@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Tela de abertura (local): eventos básicos.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

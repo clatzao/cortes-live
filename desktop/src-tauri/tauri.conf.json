@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cortes Live",
+  "version": "0.2.0",
+  "identifier": "br.cortes.live",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Cortes Live",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 640,
+        "maximized": true,
+        "backgroundColor": "#0b0c10"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Cortes Live",
+    "shortDescription": "Cortes de live com legendas e formatos prontos",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "resources": {
+      "../../backend/app/": "motor/backend/app/",
+      "../../backend/pyproject.toml": "motor/backend/pyproject.toml",
+      "../../backend/uv.lock": "motor/backend/uv.lock",
+      "../../backend/.python-version": "motor/backend/.python-version",
+      "../../frontend/dist/": "motor/frontend/dist/",
+      "../../fontes/": "motor/fontes/",
+      "bin/uv.exe": "motor/uv.exe"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["PortugueseBR"],
+        "displayLanguageSelector": false
+      }
+    }
+  }
+}

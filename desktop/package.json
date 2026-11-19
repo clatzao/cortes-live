@@ -1,0 +1,13 @@
+{
+  "name": "cortes-live-desktop",
+  "private": true,
+  "version": "0.2.0",
+  "scripts": {
+    "preparar": "node preparar.mjs",
+    "dev": "node preparar.mjs && tauri dev",
+    "build": "node preparar.mjs && tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

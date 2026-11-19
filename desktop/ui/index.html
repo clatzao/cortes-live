@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cortes Live</title>
+    <style>
+      :root {
+        --fundo: #0b0c10;
+        --superficie: #13151b;
+        --borda: #252935;
+        --texto: #eceef3;
+        --sutil: #8d95a6;
+        --destaque: #7c5cff;
+        --vermelho: #ff3b5c;
+        --perigo: #ff5d5d;
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--fundo);
+        color: var(--texto);
+        font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+      }
+      body {
+        display: grid;
+        place-items: center;
+      }
+      .caixa {
+        width: min(520px, calc(100vw - 32px));
+        text-align: center;
+      }
+      .marca {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin-bottom: 28px;
+      }
+      .ponto {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--vermelho), var(--destaque));
+        box-shadow: 0 0 18px color-mix(in srgb, var(--vermelho) 60%, transparent);
+        animation: pulso 1.6s ease-in-out infinite;
+      }
+      @keyframes pulso {
+        50% {
+          transform: scale(0.8);
+          opacity: 0.7;
+        }
+      }
+      .barra {
+        height: 4px;
+        border-radius: 999px;
+        background: var(--superficie);
+        overflow: hidden;
+        margin: 0 auto 16px;
+        width: 220px;
+      }
+      .barra div {
+        height: 100%;
+        width: 40%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--destaque), #9479ff);
+        animation: corre 1.2s ease-in-out infinite;
+      }
+      @keyframes corre {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(250%);
+        }
+      }
+      #etapa {
+        font-weight: 600;
+        min-height: 1.5em;
+      }
+      #detalhe {
+        color: var(--sutil);
+        font-size: 12px;
+        min-height: 1.5em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #erro {
+        display: none;
+        text-align: left;
+        background: var(--superficie);
+        border: 1px solid var(--borda);
+        border-left: 4px solid var(--perigo);
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-top: 8px;
+      }
+      #erro pre {
+        white-space: pre-wrap;
+        font: 12px/1.4 Consolas, monospace;
+        color: var(--sutil);
+        max-height: 200px;
+        overflow: auto;
+        margin: 8px 0 12px;
+      }
+      button {
+        font: inherit;
+        color: var(--texto);
+        background: #1b1e26;
+        border: 1px solid var(--borda);
+        border-radius: 8px;
+        padding: 7px 14px;
+        cursor: pointer;
+      }
+      button.primario {
+        background: var(--destaque);
+        border-color: transparent;
+        color: #fff;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="caixa">
+      <div class="marca"><span class="ponto"></span> Cortes Live</div>
+      <div class="barra" id="barra"><div></div></div>
+      <div id="etapa">Abrindo…</div>
+      <div id="detalhe"></div>
+      <div id="erro">
+        <strong>Não deu para abrir o programa</strong>
+        <pre id="erro-texto"></pre>
+        <button class="primario" id="denovo">Tentar de novo</button>
+        <button id="registro">Ver registro</button>
+      </div>
+    </div>
+    <script>
+      const invoke = (cmd) => window.__TAURI__.core.invoke(cmd);
+      const $ = (id) => document.getElementById(id);
+      let parado = false;
+
+      async function olhar() {
+        try {
+          const e = await invoke("estado");
+          if (e.url) {
+            $("etapa").textContent = "Pronto!";
+            location.replace(e.url);
+            return;
+          }
+          $("etapa").textContent = e.etapa || "Abrindo…";
+          $("detalhe").textContent = e.detalhe || "";
+          const temErro = !!e.erro;
+          $("erro").style.display = temErro ? "block" : "none";
+          $("barra").style.visibility = temErro ? "hidden" : "visible";
+          if (temErro) $("erro-texto").textContent = e.erro;
+        } catch (err) {
+          $("detalhe").textContent = String(err);
+        }
+        setTimeout(olhar, 400);
+      }
+
+      $("denovo").onclick = () => {
+        $("erro").style.display = "none";
+        invoke("tentar_de_novo");
+      };
+      $("registro").onclick = () => invoke("abrir_registro");
+      olhar();
+    </script>
+  </body>

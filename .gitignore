@@ -21,3 +21,10 @@ desktop.ini
 .DS_Store
 .vscode/
 .idea/
+
+# App de desktop (Tauri): dependências, compilação e o uv copiado
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/src-tauri/bin/
+desktop/instalador/
