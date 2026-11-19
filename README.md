@@ -1,37 +1,52 @@
 # Cortes Live
 
-Site local para cortar lives com legendas e formatos pré-definidos. Roda no seu PC, no navegador.
+Programa para transformar lives em cortes prontos para TikTok, Reels e Shorts: ele transcreve a live, acha os
+momentos com mais chance de viralizar, coloca legenda estilo TikTok, gera os formatos (9:16, 1:1, 16:9…) e
+as thumbnails. Tudo roda no seu PC (Windows 10/11), em qualquer placa de vídeo.
 
-## Estado atual
+**[⬇ Baixar o instalador (Windows)](https://github.com/clatzao/cortes-live/releases/latest)**
 
-As 6 partes estão prontas. A rodada de melhorias está em andamento: desempenho, fluxo (padrão dos cortes,
-vários momentos, exportar tudo, modo automático), timeline e o visual escuro estilo estúdio já foram feitos;
-faltam o programa de desktop (Tauri) e este README completo.
+Use apenas lives suas ou com permissão do criador.
 
-O visual abre no tema escuro; o botão de sol/lua no canto troca para o claro (a escolha fica salva).
+## Sumário
 
-- [x] Importar live por arquivo do PC ou link (Twitch, YouTube, Kick)
-- [x] Preview leve em 480p + forma de onda do áudio
-- [x] Timeline com miniaturas do vídeo, onda com os trechos altos em destaque, zoom (barra, teclas, no corte),
-      seleção por arraste e bordas dos cortes arrastáveis
-- [x] Cortes manuais, por lista de timestamps, ajuste fino de 0,1 s e prévia
-- [x] Exportação em fila (corte no formato original), com cancelamento
-- [x] Detecção automática de hardware (qualquer placa de vídeo)
-- [x] Parte 2 — transcrição automática (Whisper, palavra por palavra), idioma por projeto (PT / EN / misto),
-      texto sincronizado, busca sem acentos com margem antes/depois, corte a partir de texto selecionado
-- [x] Parte 3 — legendas estilo TikTok queimadas no vídeo + .SRT: 4 estilos prontos (Clássico viral, Caixa
-      colorida, Minimalista, Neon), editor de estilos com prévia ao vivo, palavra falada destacada com animação
-      pop, palavras-chave coloridas, emojis automáticos (dicionário editável), editor de legenda por corte
-- [x] Parte 4 — formatos 9:16 recorte (ajustável), 9:16 câmera + jogo (retângulos desenhados no quadro),
-      9:16 fundo desfocado, 16:9, 1:1 e original; vários formatos por corte (um arquivo cada); página Marca
-      com logo, gancho (título no topo), intro/outro e música que abaixa sozinha na fala; prévia por formato
-- [x] Parte 5 — momentos virais: o Gemini lê a transcrição (com os picos de volume como pista), sugere
-      trechos com nota, motivo, nome e gancho; cortes encaixados em frases completas; sem chave, sugestões
-      por volume + palavras-chave; roda sozinho após a transcrição; aba "Momentos" com "Virar corte"
-- [x] Parte 6 — thumbnails (YouTube 1280×720, vertical 1080×1920, quadrada 1080×1080): 6 melhores quadros
-      (rosto, nitidez e volume), recorte da pessoa por IA local, 4 templates + templates próprios, textos
-      sugeridos pelo Gemini, editor com camadas (texto, emoji, imagem, seta, círculo, retângulo, ajustes de
-      imagem, contorno, desfazer) e exportação em PNG
+- [O que ele faz](#o-que-ele-faz)
+- [Instalação fácil: programa de desktop](#instalação-fácil-programa-de-desktop-windows-1011)
+- [Instalação pelo código](#instalação-pelo-código-sem-o-instalador)
+- [Como usar](#como-usar-resumo)
+- [Atalhos do editor](#atalhos-do-editor)
+- [Hardware](#hardware) · [Legendas](#legendas) · [Formatos e marca](#formatos-e-marca) ·
+  [Momentos virais](#momentos-virais-gemini) · [Thumbnails](#thumbnails)
+- [Onde ficam os arquivos](#onde-ficam-os-arquivos)
+- [Estrutura do código](#estrutura-do-código) · [Desenvolvimento](#desenvolvimento)
+
+## O que ele faz
+
+- **Importar** a live por arquivo do PC ou link (Twitch, YouTube, Kick). Gera um preview leve, a forma de
+  onda e uma tira de miniaturas para a timeline.
+- **Transcrição automática** (Whisper, palavra por palavra) em PT, EN ou misto. O texto acompanha o vídeo, tem
+  busca sem acentos e vira corte selecionando um trecho.
+- **Momentos virais**: o Gemini (grátis) lê a transcrição, com os picos de volume como pista, e sugere trechos
+  com nota, motivo, nome e gancho, encaixados em frases completas. Sem chave, as sugestões saem só por volume
+  e palavras-chave. Dá para aceitar vários de uma vez.
+- **Modo automático**: ao importar, ele transcreve, acha os momentos e já cria os cortes; você só revisa e exporta.
+- **Editor com timeline**: miniaturas, onda com os trechos altos em destaque, zoom, seleção arrastando e bordas
+  dos cortes arrastáveis. Também cria cortes por I/O + Enter, pelo texto ou colando uma lista de horários.
+- **Legendas estilo TikTok** queimadas no vídeo, mais o `.srt`. São 4 estilos prontos e um editor de estilos;
+  a palavra falada ganha destaque com animação pop, as palavras-chave ficam coloridas e entram emojis
+  automáticos. Cada corte tem seu editor de legenda.
+- **Formatos**: 9:16 recorte (ajustável), 9:16 câmera + jogo, 9:16 fundo desfocado, 16:9, 1:1 e original.
+  Cada corte pode sair em vários formatos.
+- **Marca do canal**: logo, gancho (título no topo), intro/outro e música que abaixa sozinha na fala.
+- **Thumbnails** (YouTube, vertical e quadrada):
+  - os 6 melhores quadros, escolhidos por rosto, nitidez e volume;
+  - recorte da pessoa por IA local e templates;
+  - editor com camadas, exportado em PNG.
+- **Padrão dos cortes**: estilo de legenda, formatos e extras com que todo corte novo nasce.
+- **Exportação em fila**, com "Exportar todos". Os arquivos vão organizados em `Vídeos\Cortes Live`.
+- Detecta o hardware e se adapta a ele: NVENC, Quick Sync, AMF ou processador, e o modelo do Whisper que cabe
+  na sua placa.
+- Visual escuro estilo estúdio; o botão de sol/lua troca para o claro.
 
 ## Instalação fácil: programa de desktop (Windows 10/11)
 
@@ -95,7 +110,7 @@ momentos) fica em **Ajustes → Padrão dos cortes**.
 Na abertura, o programa testa de verdade os codificadores de vídeo e usa o primeiro que funcionar:
 NVIDIA NVENC → Intel Quick Sync → AMD AMF → processador (x264).
 
-Para a transcrição (parte 2), ele escolhe o modelo do Whisper pela placa NVIDIA:
+Para a transcrição, ele escolhe o modelo do Whisper pela placa NVIDIA:
 
 | Placa | Exemplo | Escolha |
 |---|---|---|
@@ -183,7 +198,41 @@ Numa GTX 1060, o large-v3-turbo deve levar bem menos (não testado ainda).
 - `dados/projetos/<id>/`: preview, forma de onda, miniaturas da timeline e o vídeo baixado (links)
 - `dados/banco.sqlite3`: projetos, cortes e fila
 
+`dados/` é a pasta `dados` do projeto (versão pelo código) ou `%LOCALAPPDATA%\br.cortes.live\dados` (programa
+instalado). Lá também ficam `ajustes.json` (inclui a chave do Gemini), `marca.json`, os estilos de legenda e os
+modelos de IA em `modelos/`.
+
 Excluir um projeto apaga só a pasta interna dele. O seu arquivo original e os cortes exportados ficam.
+
+## Estrutura do código
+
+```
+backend/                 servidor local (Python 3.12, FastAPI, gerenciado pelo uv)
+  app/main.py            cria o servidor, junta as rotas e serve o site
+  app/rotas/             rotas da API por assunto: projetos, cortes, legendas, marca, momentos,
+                         fila, thumbs, sistema (hardware/ajustes) e comum (funções compartilhadas)
+  app/tarefas.py         tarefas da fila: importar e exportar
+  app/transcricao.py     Whisper (faster-whisper) em blocos, palavra por palavra
+  app/viral.py           momentos virais (Gemini + sinais de volume e palavras)
+  app/legendas.py        desenho das legendas (Pillow) e .srt
+  app/formatos.py        comando do FFmpeg de cada formato (exportação e prévia)
+  app/marca.py           logo, gancho, intro/outro, música
+  app/thumbs.py          quadros candidatos, recorte da pessoa (ONNX), designs e templates
+  app/media.py           FFmpeg: análise, preview, forma de onda, miniaturas
+  app/hardware.py        detecção de placa e codificadores
+  app/cortes.py          criação de cortes com o padrão do usuário
+  app/jobs.py, db.py     fila em segundo plano e banco SQLite
+frontend/                site (React + Vite + TypeScript); o build fica em frontend/dist
+  src/paginas/           Início (projetos), Editor, Fila e Ajustes (Padrão dos cortes, Legendas,
+                         Marca do canal, IA e hardware)
+  src/componentes/       Timeline, painéis do editor (Momentos, Texto), cartão e janela do corte
+  src/thumb/             editor de thumbnail (Konva, carregado só quando abre)
+desktop/                 programa de desktop (Tauri 2, Rust) e o instalador
+  src-tauri/src/main.rs  tela de abertura, preparação (FFmpeg, Python), liga e desliga o motor
+  ui/index.html          tela de abertura
+fontes/                  fontes livres das legendas (com as licenças)
+instalar.bat, iniciar.bat, atualizar-downloader.bat   versão pelo código, sem instalador
+```
 
 ## Desenvolvimento
 
@@ -210,5 +259,3 @@ O app em Rust (`desktop/src-tauri/src/main.rs`) mostra a tela de abertura, baixa
 as bibliotecas com o `uv` embutido, liga o motor numa porta livre e o encerra junto com a janela (job object
 do Windows). A compilação ocupa ~2-3 GB em `desktop/src-tauri/target`; `cargo clean` dentro de
 `desktop/src-tauri` libera o espaço.
-
-Use apenas lives suas ou com permissão do criador.
