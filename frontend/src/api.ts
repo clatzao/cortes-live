@@ -98,6 +98,8 @@ export interface Corte {
   legenda: string | null;
   formatos: string | null;
   crop_x: number;
+  enquadramento: "fixo" | "auto";
+  trilha_foco: string | null;
   gancho: string | null;
   recursos: string | null;
   formatos_efetivos: string[];
@@ -311,6 +313,7 @@ export const api = {
     formato: string;
     t: number;
     crop_x?: number;
+    enquadramento?: "fixo" | "auto";
     layout?: Layout;
     gancho?: string;
     recursos?: Recursos;
@@ -372,7 +375,7 @@ export const api = {
     req<{ criados: Corte[]; invalidas: string[] }>(`/api/projetos/${projetoId}/cortes/lote`, "POST", { texto }),
   editarCorte: (
     id: number,
-    dados: Partial<Pick<Corte, "inicio" | "fim" | "nome" | "estilo" | "crop_x">> & {
+    dados: Partial<Pick<Corte, "inicio" | "fim" | "nome" | "estilo" | "crop_x" | "enquadramento">> & {
       com_legenda?: boolean;
       formatos?: string[] | null;
       recursos?: Recursos | null;
@@ -404,6 +407,7 @@ export const api = {
     if (!r.ok) throw new Error(`Erro ${r.status}`);
     return URL.createObjectURL(await r.blob());
   },
+  enquadrarCorte: (id: number) => req<Corte>(`/api/cortes/${id}/enquadrar`, "POST"),
   apagarCorte: (id: number) => req<{ ok: boolean }>(`/api/cortes/${id}`, "DELETE"),
   exportarCorte: (id: number, formatos?: string[]) =>
     req<Job[]>(`/api/cortes/${id}/exportar`, "POST", formatos ? { formatos } : {}),
@@ -420,6 +424,29 @@ export const api = {
   pararLive: (id: number) => req<Live>(`/api/lives/${id}/parar`, "POST"),
   removerLive: (id: number) => req<{ ok: boolean }>(`/api/lives/${id}`, "DELETE"),
 };
+
+/** Trilha do enquadramento automático, se ainda vale para o trecho atual do corte. */
+export function trilhaDoCorte(c: Corte): [number, number][] | null {
+  if (!c.trilha_foco) return null;
+  try {
+    const d = JSON.parse(c.trilha_foco) as { inicio: number; fim: number; pontos: [number, number][] };
+    if (Math.abs(d.inicio - c.inicio) > 0.05 || Math.abs(d.fim - c.fim) > 0.05) return null;
+    return d.pontos?.length ? d.pontos : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Centro do recorte no instante t (relativo ao corte), interpolando a trilha. */
+export function focoEm(pontos: [number, number][], t: number): number {
+  if (t <= pontos[0][0]) return pontos[0][1];
+  for (let i = 1; i < pontos.length; i++) {
+    const [t0, x0] = pontos[i - 1];
+    const [t1, x1] = pontos[i];
+    if (t <= t1) return t1 > t0 ? x0 + ((x1 - x0) * (t - t0)) / (t1 - t0) : x1;
+  }
+  return pontos[pontos.length - 1][1];
+}
 
 /** Mostra uma mensagem rápida no canto da tela. */
 export function avisar(texto: string, tipo: "ok" | "erro" = "ok") {

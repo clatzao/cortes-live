@@ -4,7 +4,7 @@ import re
 import shutil
 from pathlib import Path
 
-from . import ajustes, config, db, formatos, hardware, jobs, legendas, marca, media, transcricao
+from . import ajustes, config, db, enquadramento, formatos, hardware, jobs, legendas, marca, media, transcricao
 from .jobs import Cancelado, Contexto
 
 _INVALIDOS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -274,6 +274,15 @@ def formatos_do_corte(c: dict, p: dict, m: dict | None = None) -> list[str]:
     return (m or marca.ler())["formatos_padrao"]
 
 
+class _SemContexto:
+    """Para calcular o enquadramento fora de um job (sem progresso nem cancelamento)."""
+    def progresso(self, *_a, **_k) -> None:
+        pass
+
+    def checar(self) -> None:
+        pass
+
+
 def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | None = None,
                       previa_t: float | None = None, sobrescrever: dict | None = None) -> formatos.Montagem:
     """Monta tudo o que entra no vídeo (legenda, gancho, logo, música, intro/outro).
@@ -297,6 +306,18 @@ def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | N
         crop_x=float(sobrescrever.get("crop_x", c["crop_x"] if c.get("crop_x") is not None else 0.5)),
         layout=layout,
     )
+    # Enquadramento automático: o recorte segue a trilha calculada (prévia: o ponto da trilha naquele instante).
+    if sobrescrever.get("enquadramento", c.get("enquadramento")) == "auto" and fmt in formatos.USA_RECORTE:
+        pontos = enquadramento.trilha_valida(c)
+        if pontos is None and not previa:
+            pontos = enquadramento.calcular_corte(c, p, ctx or _SemContexto())
+        if pontos and previa:
+            mt.crop_x = enquadramento.valor_em(pontos, previa_t or 0.0)
+        elif pontos:
+            foco = pasta / "foco.txt"
+            foco.write_text(enquadramento.comandos_sendcmd(
+                pontos, p["largura"], formatos.largura_recorte(fmt, p["largura"], p["altura"])), encoding="utf-8")
+            mt.foco, mt.crop_x = foco, pontos[0][1]
 
     if c["com_legenda"]:
         palavras = palavras_do_corte(c)

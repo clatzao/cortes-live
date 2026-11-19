@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { api, avisar, Corte, erroTexto, Formato, Marca, Projeto, Recursos } from "../api";
+import { Crosshair, Lock, RotateCcw } from "lucide-react";
+import { api, avisar, Corte, erroTexto, focoEm, Formato, Marca, Projeto, Recursos, trilhaDoCorte } from "../api";
+import SeletorSegmentado from "./ui/SeletorSegmentado";
 import { formatar } from "../tempo";
 import LayoutFacecam from "./LayoutFacecam";
 
@@ -27,6 +29,9 @@ const RECORTE: Record<string, number> = { vertical_crop: 9 / 16, quadrado: 1 };
 export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar, onAlterado, onProjeto, onSujo }: Props) {
   const [sel, setSel] = useState<string[]>(corte.formatos_efetivos);
   const [cropX, setCropX] = useState(corte.crop_x ?? 0.5);
+  const [enq, setEnq] = useState<"fixo" | "auto">(corte.enquadramento ?? "fixo");
+  const [corteAtual, setCorteAtual] = useState(corte);
+  const trilha = trilhaDoCorte(corteAtual);
   const [gancho, setGancho] = useState(corte.gancho ?? "");
   const [recursos, setRecursos] = useState<Recursos>(corte.recursos_efetivos);
   const [verFormato, setVerFormato] = useState(corte.formatos_efetivos[0] ?? "vertical_crop");
@@ -47,7 +52,7 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
       const meu = ++pedido.current;
       setGerando(true);
       api
-        .previaFormato({ corte_id: corte.id, formato: verFormato, t, crop_x: cropX, gancho, recursos })
+        .previaFormato({ corte_id: corte.id, formato: verFormato, t, crop_x: cropX, enquadramento: enq, gancho, recursos })
         .then((u) => {
           if (meu !== pedido.current) return URL.revokeObjectURL(u); // chegou uma mais nova
           if (ultima.current) URL.revokeObjectURL(ultima.current);
@@ -59,7 +64,29 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
         .finally(() => setGerando(false));
     }, 250);
     return () => clearTimeout(id);
-  }, [corte.id, verFormato, t, cropX, gancho, recursos, projetoAtual.layout_efetivo]);
+  }, [corte.id, verFormato, t, cropX, enq, trilha !== null, gancho, recursos, projetoAtual.layout_efetivo]);
+
+  // Enquadramento automático salvo mas ainda sem trilha: acompanha até o cálculo terminar.
+  const esperandoTrilha = corteAtual.enquadramento === "auto" && trilha === null;
+  useEffect(() => {
+    if (!esperandoTrilha) return;
+    const id = setInterval(() => {
+      api
+        .cortes(corte.projeto_id)
+        .then((lista) => {
+          const c = lista.find((x) => x.id === corte.id);
+          if (!c) return;
+          setCorteAtual(c);
+          if (c.enquadramento === "fixo") {
+            setEnq("fixo");
+            avisar("Nenhum rosto encontrado neste corte: o recorte continua fixo.", "erro");
+          }
+          if (trilhaDoCorte(c) || c.enquadramento === "fixo") onAlterado(c);
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => clearInterval(id);
+  }, [esperandoTrilha, corte.id, corte.projeto_id]);
 
   function alternar(f: string) {
     setSel((s) => (s.includes(f) ? s.filter((x) => x !== f) : [...s, f]));
@@ -68,6 +95,7 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
   }
 
   function moverRecorte(e: React.PointerEvent) {
+    if (enq === "auto") return; // no automático quem decide é a trilha
     if (e.type === "pointermove" && e.buttons !== 1) return;
     const r = areaRecorte.current!.getBoundingClientRect();
     const frac = larguraRecorte();
@@ -87,7 +115,9 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
       return false;
     }
     try {
-      onAlterado(await api.editarCorte(corte.id, { formatos: sel, crop_x: cropX, gancho: gancho.trim() || null, recursos }));
+      const c = await api.editarCorte(corte.id, { formatos: sel, crop_x: cropX, enquadramento: enq, gancho: gancho.trim() || null, recursos });
+      setCorteAtual(c);
+      onAlterado(c);
       setSujo(false);
       if (fechar) onFechar();
       return true;
@@ -115,7 +145,19 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
   const fechar = onFechar;
 
   const frac = larguraRecorte();
-  const esquerda = Math.min(1 - frac, Math.max(0, cropX - frac / 2));
+  const centro = enq === "auto" && trilha ? focoEm(trilha, t) : cropX;
+  const esquerda = Math.min(1 - frac, Math.max(0, centro - frac / 2));
+
+  async function recalcular() {
+    try {
+      const c = await api.enquadrarCorte(corte.id);
+      setCorteAtual(c);
+      setEnq("auto");
+      avisar("Procurando quem fala neste corte. Acompanhe na fila.");
+    } catch (e) {
+      avisar(erroTexto(e), "erro");
+    }
+  }
 
   return (
     <>
@@ -146,7 +188,24 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
             {RECORTE[verFormato] !== undefined && (
               <div>
                 <h3>Recorte</h3>
-                <p className="sutil">Arraste a janela para escolher o que aparece (vale para 9:16 e 1:1).</p>
+                <SeletorSegmentado
+                  rotulo="Enquadramento"
+                  valor={enq}
+                  aoMudar={(v) => (setEnq(v), setSujo(true))}
+                  opcoes={[
+                    { valor: "fixo", rotulo: "Fixo", icone: <Lock size={14} aria-hidden="true" /> },
+                    { valor: "auto", rotulo: "Segue quem fala", icone: <Crosshair size={14} aria-hidden="true" /> },
+                  ]}
+                />
+                <p className="sutil">
+                  {enq === "fixo"
+                    ? "Arraste a janela para escolher o que aparece (vale para 9:16 e 1:1)."
+                    : trilha
+                      ? "O recorte acompanha o rosto de quem está falando. A janela mostra a posição neste instante."
+                      : corteAtual.enquadramento === "auto"
+                        ? "Procurando quem fala neste corte… (acompanhe na fila)"
+                        : "Salve para o programa achar quem fala neste corte."}
+                </p>
                 <div
                   className="quadro-marcacao"
                   ref={areaRecorte}
@@ -157,9 +216,15 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
                   <img src={api.urlQuadro(projeto.id, corte.inicio + t, 640)} alt="Quadro original" draggable={false} />
                   <div className="janela-recorte" style={{ left: `${esquerda * 100}%`, width: `${frac * 100}%` }} />
                 </div>
-                <button className="btn btn-peq" onClick={() => (setCropX(0.5), setSujo(true))}>
-                  Centralizar
-                </button>
+                {enq === "fixo" ? (
+                  <button className="btn btn-peq" onClick={() => (setCropX(0.5), setSujo(true))}>
+                    Centralizar
+                  </button>
+                ) : (
+                  <button className="btn btn-peq" onClick={recalcular} disabled={esperandoTrilha}>
+                    <RotateCcw size={13} aria-hidden="true" /> Recalcular
+                  </button>
+                )}
               </div>
             )}
 

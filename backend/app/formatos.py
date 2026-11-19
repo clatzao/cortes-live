@@ -50,7 +50,19 @@ def _ajustar(rect: list[float], w: int, h: int, aspecto: float) -> tuple[int, in
     return rw, rh, x, y
 
 
-def filtro_video(fmt: str, w: int, h: int, crop_x: float, layout: dict, ent: str, sai: str) -> str:
+def largura_recorte(fmt: str, w: int, h: int) -> int:
+    ow, oh = tamanho_saida(fmt, w, h)
+    return _par(min(w, h * ow / oh))
+
+
+def _caminho_filtro(p: Path) -> str:
+    """Caminho dentro de um filtro do FFmpeg (no Windows o ':' do drive precisa de escape)."""
+    return "'" + p.resolve().as_posix().replace(":", "\\:") + "'"
+
+
+def filtro_video(fmt: str, w: int, h: int, crop_x: float, layout: dict, ent: str, sai: str,
+                 foco: Path | None = None) -> str:
+    """foco: arquivo do sendcmd que move o recorte ao longo do tempo (enquadramento automático)."""
     ow, oh = tamanho_saida(fmt, w, h)
     if fmt in USA_RECORTE:
         a = ow / oh
@@ -58,6 +70,9 @@ def filtro_video(fmt: str, w: int, h: int, crop_x: float, layout: dict, ent: str
         ch = _par(min(h, cw / a))
         cx = int(min(max(0, crop_x * w - cw / 2), w - cw))
         cy = (h - ch) // 2
+        if foco is not None:
+            return (f"{ent}sendcmd=f={_caminho_filtro(foco)},crop@foco={cw}:{ch}:{cx}:{cy},"
+                    f"scale={ow}:{oh}:flags=lanczos,setsar=1{sai}")
         return f"{ent}crop={cw}:{ch}:{cx}:{cy},scale={ow}:{oh}:flags=lanczos,setsar=1{sai}"
     if fmt == "vertical_blur":
         bw, bh = ow // 4, oh // 4
@@ -100,6 +115,7 @@ class Montagem:
     fps: float
     tem_audio: bool
     crop_x: float = 0.5
+    foco: Path | None = None  # sendcmd do enquadramento automático (só nos formatos com recorte)
     layout: dict = field(default_factory=dict)
     legenda: tuple[Path, int] | None = None        # (lista ffconcat ou PNG único, y)
     gancho: tuple[Path, int, float] | None = None   # (PNG, y, duração; 0 = corte todo)
@@ -127,7 +143,8 @@ def comando(m: Montagem, video_args: list[str], destino: str, previa: bool = Fal
     dur = 0.04 if previa else m.duracao
     principal = entrada("-ss", f"{m.inicio:.3f}", "-t", f"{dur:.3f}", "-i", m.origem)
     ent = f"[{principal}:v]" + (f"scale={m.largura}:{m.altura}," if m.fonte_reduzida else "")
-    filtros.append(filtro_video(m.fmt, m.largura, m.altura, m.crop_x, m.layout, ent, "[v0]"))
+    filtros.append(filtro_video(m.fmt, m.largura, m.altura, m.crop_x, m.layout, ent, "[v0]",
+                                None if previa else m.foco))
     atual = "[v0]"
 
     def sobrepor(idx: int, x: int, y: int, rotulo: str, rgba: bool = True) -> None:

@@ -139,6 +139,8 @@ CREATE TABLE IF NOT EXISTS live_partes (
 _conn.commit()
 _adicionar_coluna("projetos", "live_id", "INTEGER REFERENCES lives(id) ON DELETE SET NULL")
 _adicionar_coluna("cortes", "origem", "TEXT NOT NULL DEFAULT 'manual'")  # manual, sugestao ou live
+_adicionar_coluna("cortes", "enquadramento", "TEXT NOT NULL DEFAULT 'fixo'")  # fixo (crop_x) ou auto (segue rosto)
+_adicionar_coluna("cortes", "trilha_foco", "TEXT")  # JSON {inicio, fim, pontos: [[t, x]...], editada}
 
 
 def executar(sql: str, params: tuple = ()) -> int:

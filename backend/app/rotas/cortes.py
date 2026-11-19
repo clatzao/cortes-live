@@ -3,12 +3,13 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from .. import config, cortes, db, formatos, jobs, legendas, tempo, tarefas
+from .. import config, cortes, db, enquadramento, formatos, jobs, legendas, tempo, tarefas
 from .comum import _projeto, _corte, _corte_completo, _validar_formatos, _validar_intervalo, _fonte_rapida, _quadro, _jpeg
 
 router = APIRouter()
@@ -31,6 +32,7 @@ class EdicaoCorte(BaseModel):
     recursos: dict[str, bool] | None = None
     gancho: str | None = None
     crop_x: float | None = Field(default=None, ge=0, le=1)
+    enquadramento: Literal["fixo", "auto"] | None = None
 
 
 class ListaTimestamps(BaseModel):
@@ -92,9 +94,30 @@ def editar_corte(corte_id: int, dados: EdicaoCorte):
     if "gancho" in enviados:
         gancho = (dados.gancho or "").strip()[:200] or None
     crop_x = c["crop_x"] if dados.crop_x is None else round(dados.crop_x, 4)
+    enq = dados.enquadramento or c["enquadramento"]
     db.executar("UPDATE cortes SET inicio=?, fim=?, nome=?, estilo=?, com_legenda=?, formatos=?, recursos=?, "
-                "gancho=?, crop_x=? WHERE id=?",
-                (inicio, fim, nome, estilo, com_legenda, fmts, recursos, gancho, crop_x, corte_id))
+                "gancho=?, crop_x=?, enquadramento=? WHERE id=?",
+                (inicio, fim, nome, estilo, com_legenda, fmts, recursos, gancho, crop_x, enq, corte_id))
+    novo = _corte(corte_id)
+    if enq == "auto" and enquadramento.trilha_valida(novo) is None and not _enquadrando(corte_id):
+        jobs.enfileirar("enquadrar", projeto_id=novo["projeto_id"], corte_id=corte_id,
+                        mensagem="Aguardando para achar quem fala")  # ligou agora ou mudou o trecho: recalcula
+    return _corte_completo(novo)
+
+
+def _enquadrando(corte_id: int) -> bool:
+    return db.um("SELECT id FROM jobs WHERE tipo='enquadrar' AND corte_id=? AND status IN ('na_fila','executando')",
+                 (corte_id,)) is not None
+
+
+@router.post("/api/cortes/{corte_id}/enquadrar")
+def recalcular_enquadramento(corte_id: int):
+    """Recalcula a trilha do enquadramento automático (e liga o modo automático)."""
+    c = _corte(corte_id)
+    db.executar("UPDATE cortes SET enquadramento='auto', trilha_foco=NULL WHERE id=?", (corte_id,))
+    if not _enquadrando(corte_id):
+        jobs.enfileirar("enquadrar", projeto_id=c["projeto_id"], corte_id=corte_id,
+                        mensagem="Aguardando para achar quem fala")
     return _corte_completo(_corte(corte_id))
 
 
@@ -182,6 +205,7 @@ class PedidoPrevia(BaseModel):
     layout: dict | None = None
     gancho: str | None = None
     recursos: dict[str, bool] | None = None
+    enquadramento: Literal["fixo", "auto"] | None = None
 
 
 @router.post("/api/previa-formato")
@@ -194,7 +218,7 @@ def previa_formato(dados: PedidoPrevia):
     if dados.formato not in formatos.FORMATOS:
         raise HTTPException(400, "Formato desconhecido.")
     sobrescrever = {k: v for k, v in dados.model_dump().items()
-                    if k in ("crop_x", "layout", "gancho", "recursos") and k in dados.model_fields_set}
+                    if k in ("crop_x", "layout", "gancho", "recursos", "enquadramento") and k in dados.model_fields_set}
     t = min(max(0.0, dados.t), max(0.0, c["fim"] - c["inicio"] - 0.05))
     pasta = Path(tempfile.mkdtemp(prefix="previa_", dir=config.DADOS))
     try:
