@@ -66,7 +66,8 @@ export interface Ajustes {
   estilo_padrao: string;
   legenda_padrao: boolean;
   auto_cortes: boolean;
-  opcoes: { whisper_modelo: string[]; whisper_dispositivo: string[] };
+  download_qualidade: string;
+  opcoes: { whisper_modelo: string[]; whisper_dispositivo: string[]; download_qualidade: string[] };
 }
 
 export interface Sugestao {

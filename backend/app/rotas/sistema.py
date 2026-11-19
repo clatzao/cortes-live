@@ -25,6 +25,7 @@ def detectar_hardware():
 class Ajustes(BaseModel):
     whisper_modelo: str | None = None
     whisper_dispositivo: str | None = None
+    download_qualidade: str | None = None
     gemini_chave: str | None = None   # "" apaga a chave
     gemini_modelo: str | None = None
     viral_min: int | None = None
@@ -39,7 +40,8 @@ class Ajustes(BaseModel):
 @router.get("/api/ajustes")
 def ver_ajustes():
     return {**ajustes.publico(), "opcoes": {"whisper_modelo": ajustes.MODELOS_WHISPER,
-                                            "whisper_dispositivo": ajustes.DISPOSITIVOS}}
+                                            "whisper_dispositivo": ajustes.DISPOSITIVOS,
+                                            "download_qualidade": ajustes.QUALIDADES}}
 
 
 @router.put("/api/ajustes")

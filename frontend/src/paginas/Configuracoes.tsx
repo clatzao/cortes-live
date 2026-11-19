@@ -169,6 +169,22 @@ export default function Configuracoes({ hw, onHw }: { hw: Hardware | null; onHw:
                 <p className="sutil">
                   Se o modo escolhido não funcionar neste PC, o programa usa o processador automaticamente.
                 </p>
+                <label>
+                  Qualidade do download por link
+                  <select
+                    value={ajustes.download_qualidade}
+                    onChange={(e) => salvar({ download_qualidade: e.target.value })}
+                  >
+                    {ajustes.opcoes.download_qualidade.map((q) => (
+                      <option key={q} value={q}>
+                        {q === "melhor" ? "Melhor disponível (4K pode demorar muito)" : `Até ${q}p`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="sutil">
+                  Até 1080p é o recomendado: os cortes saem em 1080p e o download fica bem mais rápido.
+                </p>
               </div>
             )}
           </section>

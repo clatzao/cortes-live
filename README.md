@@ -51,7 +51,7 @@ Use apenas lives suas ou com permissão do criador.
 ## Instalação fácil: programa de desktop (Windows 10/11)
 
 1. Baixe o instalador:
-   **[Cortes.Live_0.4.0_x64-setup.exe](https://github.com/clatzao/cortes-live/releases/download/v0.4.0/Cortes.Live_0.4.0_x64-setup.exe)**
+   **[Cortes.Live_0.4.1_x64-setup.exe](https://github.com/clatzao/cortes-live/releases/download/v0.4.1/Cortes.Live_0.4.1_x64-setup.exe)**
    (12 MB; versões novas ficam em [Releases](https://github.com/clatzao/cortes-live/releases)) e abra. Ele instala só para o seu usuário
    (não pede administrador) e cria o atalho no menu Iniciar e na área de trabalho.
    Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**
@@ -106,6 +106,9 @@ Se os links pararem de funcionar (os sites mudam com frequência), rode **`atual
 
 1. Em **Projetos**, cole o link da live ou clique em **Procurar arquivo…** e depois em **Importar**.
    Marque **Criar os cortes automaticamente** para ele transcrever, achar os momentos e já criar os cortes.
+   A transcrição começa enquanto o resto ainda prepara: num link do YouTube/Twitch, o áudio baixa primeiro e
+   já vai sendo transcrito enquanto o vídeo baixa; num arquivo, ela roda junto com a geração do preview.
+   Links baixam até 1080p por padrão (mais rápido; dá para mudar em **Ajustes → IA e hardware**).
 2. Abra o projeto. Na aba **Momentos**, marque os trechos e clique em **Virar N cortes** (ou crie cortes
    arrastando na timeline, com I/O + Enter, pelo **Texto** ou colando **Horários**).
 3. Ajuste os cortes na timeline puxando as bordas. Em **Editar**, mude legenda, formatos, gancho e thumbnail.

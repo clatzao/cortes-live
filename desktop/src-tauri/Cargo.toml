@@ -1,6 +1,6 @@
 [package]
 name = "cortes-live"
-version = "0.4.0"
+version = "0.4.1"
 description = "Cortes Live: cortes de live com legendas e formatos prontos"
 edition = "2021"
 

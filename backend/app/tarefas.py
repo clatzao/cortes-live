@@ -4,10 +4,11 @@ import re
 import shutil
 from pathlib import Path
 
-from . import config, db, formatos, hardware, jobs, legendas, marca, media, transcricao
+from . import ajustes, config, db, formatos, hardware, jobs, legendas, marca, media, transcricao
 from .jobs import Cancelado, Contexto
 
 _INVALIDOS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_SEM_COR = re.compile(r"\x1b\[[0-9;]*m")  # códigos de cor que o yt-dlp põe nas mensagens
 
 
 def nome_seguro(txt: str, limite: int = 60) -> str:
@@ -37,10 +38,14 @@ def pasta_projeto(projeto_id: int) -> Path:
 
 # ---------------------------------------------------------------- download por link
 
-def _baixar(url: str, pasta: Path, ctx: Contexto, peso: float) -> tuple[str, str | None]:
+def _baixar(url: str, pasta: Path, ctx: Contexto, peso: float,
+            ao_ter_audio=None) -> tuple[str, str | None]:
+    """Baixa o vídeo do link. Quando o site separa áudio e vídeo (YouTube, Twitch), baixa o áudio
+    primeiro e chama ao_ter_audio(caminho, titulo), para a transcrição começar enquanto o vídeo baixa."""
+
     import yt_dlp  # importado aqui para o programa abrir rápido
 
-    arquivos_concluidos = {"n": 0}
+    faixa = {"nome": "", "ini": 0.0, "peso": 1.0}
 
     def gancho(d: dict) -> None:
         if ctx.cancelado():
@@ -48,16 +53,11 @@ def _baixar(url: str, pasta: Path, ctx: Contexto, peso: float) -> tuple[str, str
         if d.get("status") == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
             frac = (d.get("downloaded_bytes") or 0) / total if total else 0.0
-            etapa = arquivos_concluidos["n"] + 1
-            vel = d.get("_speed_str", "").strip()
-            ctx.progresso(peso * min(1.0, frac), f"Baixando (parte {etapa}) {vel}".strip())
-        elif d.get("status") == "finished":
-            arquivos_concluidos["n"] += 1
+            vel = _SEM_COR.sub("", d.get("_speed_str") or "").strip()
+            ctx.progresso(peso * (faixa["ini"] + faixa["peso"] * min(1.0, frac)),
+                          f"Baixando {faixa['nome']} {vel}".replace("  ", " ").strip())
 
     opcoes = {
-        "outtmpl": str(pasta / "original.%(ext)s"),
-        "format": "bv*+ba/b",
-        "merge_output_format": "mkv",
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
@@ -65,8 +65,15 @@ def _baixar(url: str, pasta: Path, ctx: Contexto, peso: float) -> tuple[str, str
         "progress_hooks": [gancho],
         "retries": 10,
         "fragment_retries": 10,
-        "concurrent_fragment_downloads": 4,
+        # lives da Twitch/Kick vêm em milhares de pedacinhos (HLS): baixar 16 de cada vez acelera muito
+        "concurrent_fragment_downloads": 16,
+        # downloads diretos (YouTube) em blocos de 10 MB evitam a limitação de velocidade por conexão
+        "http_chunk_size": 10 * 1024 * 1024,
     }
+    qualidade = ajustes.ler()["download_qualidade"]
+    if qualidade != "melhor":
+        # a maior resolução até o limite; no empate, H.264 (que o programa decodifica bem mais rápido que AV1)
+        opcoes["format_sort"] = [f"res:{qualidade}", "fps", "vcodec:h264"]
     if config.FFMPEG:
         opcoes["ffmpeg_location"] = str(Path(config.FFMPEG).parent)
     # O YouTube exige um runtime JavaScript; usa os que estiverem instalados.
@@ -75,30 +82,74 @@ def _baixar(url: str, pasta: Path, ctx: Contexto, peso: float) -> tuple[str, str
     if runtimes:
         opcoes["js_runtimes"] = runtimes
 
+    def baixar(formato: str, nome_arquivo: str, mesclar: bool = False) -> str:
+        # Lê o link de novo a cada etapa: o YouTube exige alguns segundos entre ler e baixar, e o yt-dlp
+        # só respeita essa espera na mesma leitura (reaproveitar a prévia dava erro 403).
+        extra = {"format": formato, "outtmpl": str(pasta / f"{nome_arquivo}.%(ext)s")}
+        if mesclar:
+            extra["merge_output_format"] = "mkv"
+        with yt_dlp.YoutubeDL({**opcoes, **extra}) as ydl:
+            info = ydl.extract_info(url, download=True)
+        baixados = info.get("requested_downloads") or []
+        caminho = baixados[0].get("filepath") if baixados else None
+        if not caminho or not Path(caminho).exists():
+            candidatos = sorted(pasta.glob(f"{nome_arquivo}.*"), key=lambda p: p.stat().st_size, reverse=True)
+            if not candidatos:
+                raise RuntimeError("O download terminou, mas o arquivo não foi encontrado.")
+            caminho = str(candidatos[0])
+        return caminho
+
     ctx.progresso(0, "Consultando o link", forcar=True)
     try:
         with yt_dlp.YoutubeDL(opcoes) as ydl:
             previa = ydl.extract_info(url, download=False)
-            if previa.get("_type") == "playlist":
-                raise RuntimeError("O link é uma playlist/canal. Cole o link de um vídeo ou VOD específico.")
-            if previa.get("is_live") or previa.get("live_status") in ("is_live", "is_upcoming"):
-                raise RuntimeError("Essa live ainda está ao vivo ou não começou. Aguarde ela virar VOD.")
-            info = ydl.process_ie_result(previa, download=True)
+        if previa.get("_type") == "playlist":
+            raise RuntimeError("O link é uma playlist/canal. Cole o link de um vídeo ou VOD específico.")
+        if previa.get("is_live") or previa.get("live_status") in ("is_live", "is_upcoming"):
+            raise RuntimeError("Essa live ainda está ao vivo ou não começou. Aguarde ela virar VOD.")
+        titulo = previa.get("title")
+        fmts = previa.get("formats") or []
+        so_audio = any(f.get("vcodec") == "none" and f.get("acodec") not in (None, "none") for f in fmts)
+        so_video = any(f.get("acodec") == "none" and f.get("vcodec") not in (None, "none") for f in fmts)
+
+        def tudo_junto(ini: float = 0.0) -> str:
+            faixa.update(nome="", ini=ini, peso=1.0 - ini)
+            return baixar("bv*+ba/b", "original", mesclar=True)
+
+        if not (ao_ter_audio and so_audio and so_video):
+            return tudo_junto(), titulo
+
+        # 1) só o áudio (pequeno): a transcrição já pode começar
+        faixa.update(nome="o áudio", ini=0.0, peso=0.15)
+        try:
+            audio = baixar("ba", "audio")
+        except yt_dlp.utils.DownloadError:
+            if ctx.cancelado():
+                raise
+            return tudo_junto(), titulo  # o site recusou o áudio separado: baixa do jeito normal
+        ao_ter_audio(audio, titulo)
+        # 2) só o vídeo, e junta com o áudio já baixado (sem recodificar)
+        faixa.update(nome="o vídeo", ini=0.15, peso=0.85)
+        try:
+            video = baixar("bv", "video")
+        except yt_dlp.utils.DownloadError:
+            if ctx.cancelado():
+                raise
+            return tudo_junto(0.15), titulo
     except Cancelado:
         raise
     except yt_dlp.utils.DownloadError as e:
         if ctx.cancelado():
             raise Cancelado() from e
-        raise RuntimeError(f"Falha no download: {e}") from e
+        raise RuntimeError(f"Falha no download: {_SEM_COR.sub('', str(e))}") from e
 
-    baixados = info.get("requested_downloads") or []
-    caminho = baixados[0].get("filepath") if baixados else None
-    if not caminho or not Path(caminho).exists():
-        candidatos = sorted(pasta.glob("original.*"), key=lambda p: p.stat().st_size, reverse=True)
-        if not candidatos:
-            raise RuntimeError("O download terminou, mas o arquivo não foi encontrado.")
-        caminho = str(candidatos[0])
-    return caminho, info.get("title")
+    ctx.progresso(peso, "Juntando áudio e vídeo", forcar=True)
+    destino = pasta / "original.mkv"
+    media.rodar_ffmpeg(["-i", video, "-i", audio, "-map", "0:v:0", "-map", "1:a:0", "-c", "copy",
+                        str(destino)], 0, ctx, peso, 0.0, "Juntando áudio e vídeo")
+    media.apagar_arquivo(Path(video))
+    media.apagar_arquivo(Path(audio))  # a transcrição já leu o áudio antes (ou lê do vídeo final)
+    return str(destino), titulo
 
 
 # ---------------------------------------------------------------- importar
@@ -115,11 +166,28 @@ def importar(ctx: Contexto) -> str | None:
     db.executar("UPDATE projetos SET status='processando', erro=NULL WHERE id=?", (p["id"],))
     pasta = pasta_projeto(p["id"])
 
-    base = 0.0
-    if p["origem"] == "link":
-        caminho, titulo = _baixar(p["entrada"], pasta, ctx, 0.5)
+    # A transcrição começa o quanto antes: num link, logo que o áudio baixa; num arquivo, antes do proxy.
+    transcricao_iniciada = False
+
+    def renomear(titulo: str | None) -> None:
         if titulo and p["nome"] == p["entrada"]:
             db.executar("UPDATE projetos SET nome=? WHERE id=?", (titulo[:200], p["id"]))
+
+    def ao_ter_audio(audio: str, titulo: str | None) -> None:
+        nonlocal transcricao_iniciada
+        renomear(titulo)
+        ia = media.analisar(audio, so_audio=True)
+        if not ia["tem_audio"]:
+            return
+        media.gerar_ondas(audio, pasta / "ondas.json", ia, ctx, 0.075, 0.0)
+        db.executar("UPDATE projetos SET duracao=? WHERE id=?", (ia["duracao"], p["id"]))
+        jobs.enfileirar("transcrever", projeto_id=p["id"], params={"audio": audio})
+        transcricao_iniciada = True
+
+    base = 0.0
+    if p["origem"] == "link":
+        caminho, titulo = _baixar(p["entrada"], pasta, ctx, 0.5, ao_ter_audio)
+        renomear(titulo)
         base = 0.5
     else:
         caminho = p["entrada"]
@@ -131,7 +199,11 @@ def importar(ctx: Contexto) -> str | None:
                 (caminho, info["duracao"], info["largura"], info["altura"], info["fps"], p["id"]))
 
     resto = 1.0 - base
-    media.gerar_ondas(caminho, pasta / "ondas.json", info, ctx, base, resto * 0.1)
+    if not transcricao_iniciada:
+        media.gerar_ondas(caminho, pasta / "ondas.json", info, ctx, base, resto * 0.1)
+        if info["tem_audio"]:
+            jobs.enfileirar("transcrever", projeto_id=p["id"])
+            transcricao_iniciada = True
     parcial = pasta / "proxy.parcial.mp4"
     try:
         media.gerar_proxy(caminho, parcial, info, ctx, base + resto * 0.1, resto * 0.9)
@@ -140,9 +212,10 @@ def importar(ctx: Contexto) -> str | None:
         media.apagar_arquivo(parcial)
     media.miniaturas_em_segundo_plano(p["id"], info["duracao"])  # tira de quadros da timeline
 
-    db.executar("UPDATE projetos SET status='pronto', erro=NULL WHERE id=?", (p["id"],))
-    if info["tem_audio"]:
-        jobs.enfileirar("transcrever", projeto_id=p["id"])
+    with transcricao.FIM:  # se a transcrição terminou antes do vídeo, os momentos virais começam agora
+        db.executar("UPDATE projetos SET status='pronto', erro=NULL WHERE id=?", (p["id"],))
+        if transcricao.completa(p["id"]):
+            transcricao.depois_de_transcrever(p["id"])
     return None
 
 

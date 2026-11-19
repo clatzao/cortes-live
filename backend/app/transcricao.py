@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from . import ajustes, config, db, hardware, jobs, media
-from .jobs import Contexto
+from .jobs import Cancelado, Contexto
 from .tempo import formatar
 
 TAXA = 16000
@@ -26,6 +26,8 @@ JANELA_SILENCIO = 30  # procura silêncio até 30 s antes/depois do ponto ideal
 _modelo = None
 _chave_modelo: tuple | None = None
 _lock = threading.Lock()
+FIM = threading.Lock()  # fim da transcrição x fim da importação: quem terminar por último chama a análise
+LOTE_CPU = 1  # no processador o lote ficou mais lento (medido: 108 s x 89 s em 4 min de fala)
 _dlls_prontas = False
 
 # Frases que o Whisper costuma "inventar" em trechos de música ou silêncio.
@@ -172,17 +174,26 @@ def transcrever(ctx: Contexto) -> str | None:
     p = db.um("SELECT * FROM projetos WHERE id=?", (ctx.job["projeto_id"],))
     if not p:
         raise RuntimeError("O projeto foi removido.")
-    if p["status"] != "pronto" or not p["caminho_original"]:
+    # "audio": num link, o áudio baixado antes do vídeo (a transcrição começa durante o download).
+    # Se o vídeo já terminou e o áudio separado foi apagado, usa o vídeo final.
+    audio_avulso = ctx.params.get("audio")
+    if audio_avulso and not Path(audio_avulso).is_file():
+        audio_avulso = None
+    origem = audio_avulso or p["caminho_original"]
+    if not origem or not Path(origem).is_file():
         raise RuntimeError("Importe o projeto antes de transcrever.")
-    origem = p["caminho_original"]
-    if not media.analisar(origem)["tem_audio"]:
+    info_origem = media.analisar(origem, so_audio=bool(audio_avulso))
+    if not info_origem["tem_audio"]:
         raise RuntimeError("O vídeo não tem áudio.")
 
     pasta = config.PROJETOS / str(p["id"])
     bruto = pasta / "audio16k.raw"
     try:
         media.rodar_ffmpeg(["-i", origem, "-map", "0:a:0", "-vn", "-ac", "1", "-ar", str(TAXA),
-                            "-f", "s16le", str(bruto)], p["duracao"], ctx, 0.0, 0.05, "Extraindo o áudio")
+                            "-f", "s16le", str(bruto)], info_origem["duracao"], ctx, 0.0, 0.05, "Extraindo o áudio")
+        atual = db.um("SELECT caminho_original FROM projetos WHERE id=?", (p["id"],)) or {}
+        if audio_avulso and atual.get("caminho_original"):  # vídeo final pronto: o áudio separado sobrou
+            media.apagar_arquivo(Path(audio_avulso))
         modelo, (disp, ct, nome) = _carregar(ctx)
         total = bruto.stat().st_size / 2 / TAXA
 
@@ -191,8 +202,14 @@ def transcrever(ctx: Contexto) -> str | None:
             "vad_filter": True,
             "vad_parameters": {"min_silence_duration_ms": 500},
             "condition_on_previous_text": False,
-            "beam_size": 5 if disp == "cuda" else 1,
+            "beam_size": 1,  # busca gulosa: bem mais rápida, quase a mesma qualidade
         }
+        # Modo em lote: vários trechos de fala passam juntos pelo modelo (2-4x mais rápido na placa).
+        lote = _tamanho_lote(disp, nome, ct)
+        em_lote = None
+        if lote > 1:
+            from faster_whisper import BatchedInferencePipeline
+            em_lote = BatchedInferencePipeline(model=modelo)
         if p["idioma"] == "misto":
             parametros["multilingual"] = True
         else:
@@ -213,32 +230,85 @@ def transcrever(ctx: Contexto) -> str | None:
             amostras = np.fromfile(bruto, dtype=np.int16, count=int((b - a) * TAXA), offset=int(a * TAXA) * 2)
             audio = amostras.astype(np.float32) / 32768.0
             del amostras
-            segs, _info = modelo.transcribe(audio, **parametros)
-            for s in segs:
-                ctx.checar()
-                texto = s.text.strip()
-                if not texto or _alucinacao(texto) or (s.no_speech_prob > 0.8 and s.avg_logprob < -1.0):
-                    continue
-                palavras = [[round(w.start + a, 2), round(max(w.end, w.start) + a, 2), w.word.strip(),
-                             round(w.probability, 2)] for w in (s.words or []) if w.word.strip()]
-                segmentos.append({"inicio": round(s.start + a, 2), "fim": round(max(s.end, s.start) + a, 2),
-                                  "texto": texto, "palavras": palavras})
-                feito = min(1.0, (a + s.end) / total)
-                decorrido = time.time() - inicio_relogio
-                restante = f" · faltam ~{formatar(decorrido / feito * (1 - feito))[:8]}" if feito > 0.02 else ""
-                ctx.progresso(0.08 + 0.92 * feito, f"Transcrevendo {formatar(a + s.end)[:8]} de "
-                                                    f"{formatar(total)[:8]}{restante}")
-                if time.time() - ultimo_salvo > 10:
-                    _salvar(destino, resultado)
-                    ultimo_salvo = time.time()
+            antes = len(segmentos)
+            try:
+                if em_lote is not None:
+                    segs, _info = em_lote.transcribe(audio, batch_size=lote, without_timestamps=False,
+                                                     **parametros)
+                else:
+                    segs, _info = modelo.transcribe(audio, **parametros)
+                _juntar(segs, a, segmentos, ctx, total, inicio_relogio)
+            except Cancelado:
+                raise
+            except Exception:  # noqa: BLE001 - ex.: sem memória na placa com o lote; refaz o bloco sem lote
+                if em_lote is None:
+                    raise
+                em_lote = None
+                del segmentos[antes:]
+                ctx.progresso(0.08 + 0.92 * min(1.0, a / total), "Pouca memória para o modo em lote; "
+                                                                 "seguindo no modo normal", forcar=True)
+                segs, _info = modelo.transcribe(audio, **parametros)
+                _juntar(segs, a, segmentos, ctx, total, inicio_relogio)
+            if time.time() - ultimo_salvo > 10:
+                _salvar(destino, resultado)
+                ultimo_salvo = time.time()
             del audio
             ctx.progresso(0.08 + 0.92 * min(1.0, b / total), forcar=True)
 
-        resultado["parcial"] = False
-        _salvar(final, resultado)
-        if (ajustes.ler()["viral_auto"] or p.get("auto_cortes")) and segmentos:
-            jobs.enfileirar("analisar", projeto_id=p["id"])  # momentos virais logo em seguida
+        with FIM:
+            resultado["parcial"] = False
+            _salvar(final, resultado)
+            pronto = (db.um("SELECT status FROM projetos WHERE id=?", (p["id"],)) or {}).get("status") == "pronto"
+            if pronto and segmentos:
+                depois_de_transcrever(p["id"])
+            # se o vídeo ainda está baixando/processando, o importar chama depois_de_transcrever ao terminar
         return str(final)
     finally:
         media.apagar_arquivo(bruto)
         media.apagar_arquivo(caminho(p["id"]).with_name("transcricao.nova.json"))
+
+
+def _juntar(segs, a: float, segmentos: list, ctx: Contexto, total: float, inicio_relogio: float) -> None:
+    """Converte os segmentos do Whisper (tempos relativos ao bloco que começa em a) e mostra o progresso."""
+    for s in segs:
+        ctx.checar()
+        texto = s.text.strip()
+        if not texto or _alucinacao(texto) or (s.no_speech_prob > 0.8 and s.avg_logprob < -1.0):
+            continue
+        palavras = [[round(w.start + a, 2), round(max(w.end, w.start) + a, 2), w.word.strip(),
+                     round(w.probability, 2)] for w in (s.words or []) if w.word.strip()]
+        segmentos.append({"inicio": round(s.start + a, 2), "fim": round(max(s.end, s.start) + a, 2),
+                          "texto": texto, "palavras": palavras})
+        feito = min(1.0, (a + s.end) / total)
+        decorrido = time.time() - inicio_relogio
+        restante = f" · faltam ~{formatar(decorrido / feito * (1 - feito))[:8]}" if feito > 0.02 else ""
+        ctx.progresso(0.08 + 0.92 * feito, f"Transcrevendo {formatar(a + s.end)[:8]} de "
+                                            f"{formatar(total)[:8]}{restante}")
+
+
+def _tamanho_lote(disp: str, nome: str, ct: str) -> int:
+    """Quantos trechos passam juntos pelo modelo, pela memória livre da placa (ou 1 = sem lote)."""
+    if disp != "cuda":
+        return LOTE_CPU
+    placas = (hardware.estado() or {}).get("nvidia") or []
+    if not placas:
+        return 4
+    vram = max(g["vram_gb"] for g in placas)
+    livre = vram * 0.85 - 0.4 - hardware._MEMORIA.get(nome, {}).get(ct, 2.5)
+    return 16 if livre >= 4 else 8 if livre >= 2 else 4
+
+
+def completa(projeto_id: int) -> bool:
+    """A transcrição do projeto terminou (não é só a parcial salva durante o andamento)?"""
+    try:
+        dados = json.loads(caminho(projeto_id).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return not dados.get("parcial") and bool(dados.get("segmentos"))
+
+
+def depois_de_transcrever(projeto_id: int) -> None:
+    """Momentos virais logo em seguida (se ligado), só com o projeto pronto. Chamar dentro de FIM."""
+    p = db.um("SELECT auto_cortes FROM projetos WHERE id=?", (projeto_id,)) or {}
+    if ajustes.ler()["viral_auto"] or p.get("auto_cortes"):
+        jobs.enfileirar("analisar", projeto_id=projeto_id)

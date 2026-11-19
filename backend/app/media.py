@@ -34,8 +34,8 @@ def proxy_de(projeto_id: int) -> Path:
     return config.PROJETOS / str(projeto_id) / "proxy.mp4"
 
 
-def analisar(caminho: str) -> dict:
-    """Lê duração, resolução e fps do vídeo com o ffprobe."""
+def analisar(caminho: str, so_audio: bool = False) -> dict:
+    """Lê duração, resolução e fps do vídeo com o ffprobe (so_audio: aceita arquivo só de áudio)."""
     _exigir_ffmpeg()
     r = subprocess.run(
         [config.FFPROBE, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", caminho],
@@ -48,7 +48,7 @@ def analisar(caminho: str) -> dict:
     video = next((s for s in streams if s.get("codec_type") == "video"
                   and not s.get("disposition", {}).get("attached_pic")), None)
     audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
-    if video is None:
+    if video is None and not so_audio:
         raise RuntimeError("O arquivo não tem faixa de vídeo.")
 
     def _fps(txt: str | None) -> float:
@@ -58,6 +58,7 @@ def analisar(caminho: str) -> dict:
         except ValueError:
             return 0.0
 
+    video = video or {}
     fps = _fps(video.get("avg_frame_rate")) or _fps(video.get("r_frame_rate")) or 30.0
     duracao = float(dados.get("format", {}).get("duration") or video.get("duration") or 0)
     if duracao <= 0:
