@@ -17,17 +17,19 @@ _ERRO_HOOKS: dict[str, Callable] = {}
 # impede importar ou exportar cortes ("geral") ao mesmo tempo.
 _FAIXAS: dict[str, list[str]] = {}
 _acordar: dict[str, threading.Event] = {}
+_TRABALHADORES: dict[str, int] = {}  # quantos jobs da faixa rodam ao mesmo tempo (padrão 1)
 
 
 class Cancelado(Exception):
     pass
 
 
-def registrar(tipo: str, ao_falhar: Callable | None = None, faixa: str = "geral"):
+def registrar(tipo: str, ao_falhar: Callable | None = None, faixa: str = "geral", trabalhadores: int = 1):
     def deco(fn):
         _HANDLERS[tipo] = fn
         _FAIXAS.setdefault(faixa, []).append(tipo)
         _acordar.setdefault(faixa, threading.Event())
+        _TRABALHADORES[faixa] = max(_TRABALHADORES.get(faixa, 1), trabalhadores)
         if ao_falhar:
             _ERRO_HOOKS[tipo] = ao_falhar
         return fn
@@ -95,14 +97,16 @@ def _laco(faixa: str) -> None:
     marcadores = ",".join("?" * len(tipos))
     evento = _acordar[faixa]
     while True:
-        job = db.um(f"SELECT * FROM jobs WHERE status='na_fila' AND tipo IN ({marcadores}) ORDER BY id LIMIT 1",
-                    tuple(tipos))
+        with db._lock:  # pegar e marcar juntos: com vários trabalhadores na faixa, dois não pegam o mesmo job
+            job = db.um(f"SELECT * FROM jobs WHERE status='na_fila' AND tipo IN ({marcadores}) ORDER BY id LIMIT 1",
+                        tuple(tipos))
+            if job:
+                db.executar("UPDATE jobs SET status='executando', mensagem='Iniciando', atualizado_em=? WHERE id=?",
+                            (db.agora(), job["id"]))
         if not job:
             evento.wait(timeout=2)
             evento.clear()
             continue
-        db.executar("UPDATE jobs SET status='executando', mensagem='Iniciando', atualizado_em=? WHERE id=?",
-                    (db.agora(), job["id"]))
         ctx = Contexto(job)
         handler = _HANDLERS.get(job["tipo"])
         try:
@@ -137,4 +141,5 @@ def iniciar() -> None:
     db.executar("UPDATE jobs SET status='na_fila', cancelar=0, mensagem='Retomado após reinício' "
                 "WHERE status='executando'")
     for faixa in _FAIXAS:
-        threading.Thread(target=_laco, args=(faixa,), daemon=True, name=f"fila-{faixa}").start()
+        for n in range(_TRABALHADORES.get(faixa, 1)):
+            threading.Thread(target=_laco, args=(faixa,), daemon=True, name=f"fila-{faixa}-{n}").start()

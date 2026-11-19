@@ -160,7 +160,7 @@ export default function Lives() {
       )}
       {ativas.length > 0 && (
         <p className="sutil">
-          Para parar uma gravação, abra a live. {ativas.length > 1 && "Só uma live grava por vez: as outras esperam na fila."}
+          Para parar uma gravação, abra a live. Até 4 lives gravam ao mesmo tempo.
         </p>
       )}
     </div>

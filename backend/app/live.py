@@ -10,6 +10,7 @@ onde a anterior terminou (o tempo em que ficou fora do ar não existe na gravaç
 """
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -36,6 +37,8 @@ NOTA_MINIMA = 60         # nota mínima do Gemini para virar corte sozinho
 ENERGIA_MINIMA = 35      # sem Gemini: só trechos com bastante volume viram corte
 SOBREPOSICAO = 0.5       # momento que repete mais da metade de um anterior é descartado
 
+# abaixo disso a gravação para sozinha (o que já foi gravado vira projeto); a variável serve para testes
+DISCO_MINIMO_GB = float(os.environ.get("CORTES_DISCO_MINIMO_GB") or 2)
 ATIVOS = ("aguardando", "gravando", "reconectando", "finalizando")
 _OFFLINE = re.compile(r"not (currently )?live|is offline|offline|will begin|has not started|"
                       r"no video formats|live event|premieres in|is not live", re.IGNORECASE)
@@ -124,7 +127,8 @@ def analise_pendente(live_id: int) -> bool:
 # ---------------------------------------------------------------- consulta e gravação
 
 def _opcoes_ytdlp() -> dict:
-    opcoes: dict = {"quiet": True, "no_warnings": True, "noplaylist": True, "format": "b/best"}
+    # "b" = áudio e vídeo juntos; as lives do YouTube só têm separados ("bv*+ba"), que o streamlink junta ao gravar
+    opcoes: dict = {"quiet": True, "no_warnings": True, "noplaylist": True, "format": "b/bv*+ba/best"}
     qualidade = ajustes.ler()["download_qualidade"]
     if qualidade != "melhor":
         opcoes["format_sort"] = [f"res:{qualidade}", "fps", "vcodec:h264"]
@@ -148,14 +152,16 @@ def consultar(url: str) -> dict | None:
         raise RuntimeError(f"Não consegui abrir o canal: {msg}") from e
     if info.get("_type") == "playlist" or not info.get("is_live") and info.get("live_status") != "is_live":
         return None
-    if not info.get("url"):
+    if not info.get("url") and not info.get("requested_formats"):
         raise RuntimeError("A live está no ar, mas não encontrei um endereço de vídeo para gravar.")
     return info
 
 
 def _cmd_streamlink(url: str) -> list[str]:
-    """Comando do streamlink para a Twitch, na qualidade escolhida em Ajustes (sem passar do limite)."""
+    """Comando do streamlink (Twitch e YouTube), na qualidade escolhida em Ajustes (sem passar do limite)."""
     cmd = [sys.executable, "-m", "streamlink", "--stdout", "--loglevel", "warning"]
+    if config.FFMPEG:
+        cmd += ["--ffmpeg-ffmpeg", str(config.FFMPEG)]  # o YouTube manda áudio e vídeo separados: o streamlink junta
     qualidade = ajustes.ler()["download_qualidade"]
     if qualidade != "melhor":
         cmd += ["--stream-sorting-excludes", f">{qualidade}p"]
@@ -179,10 +185,12 @@ def _gravar_parte(live_id: int, info: dict, ctx: Contexto) -> None:
         _atualizar(live_id, titulo=str(titulo)[:200])
 
     fonte: subprocess.Popen | None = None  # streamlink (só Twitch), que entrega o vídeo ao FFmpeg pelo pipe
-    if live["plataforma"] == "twitch":
-        # O streamlink descarta os anúncios que a Twitch mistura na live (sem login, a Twitch troca o conteúdo pela
-        # tela de intervalo comercial); o yt-dlp gravaria esses trechos.
-        fonte = subprocess.Popen(_cmd_streamlink(live["url"]), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+    if live["plataforma"] in ("twitch", "youtube"):
+        # Twitch: o streamlink descarta os anúncios que a Twitch mistura na live (sem login, a Twitch troca o
+        # conteúdo pela tela de intervalo comercial). YouTube: as lives vêm com áudio e vídeo separados e o
+        # streamlink junta os dois. Kick vai direto pelo FFmpeg com o endereço do yt-dlp.
+        alvo = live["url"] if live["plataforma"] == "twitch" else (info.get("webpage_url") or live["url"])
+        fonte = subprocess.Popen(_cmd_streamlink(alvo), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, creationflags=config.SEM_JANELA)
         entrada = ["-f", "mpegts", "-i", "pipe:0"]
     else:
@@ -241,6 +249,8 @@ def _gravar_parte(live_id: int, info: dict, ctx: Contexto) -> None:
                 if (deslocamento + dur) - atual["analisado_ate"] >= atual["janela_s"] and not analise_pendente(live_id):
                     jobs.enfileirar("live_analisar", projeto_id=live["projeto_id"], params={"live_id": live_id},
                                     mensagem="Aguardando para analisar o trecho novo")
+            if disco_livre_gb() < DISCO_MINIMO_GB and not obter(live_id)["parar"]:
+                _atualizar(live_id, parar=1, erro=f"Gravação parada: menos de {DISCO_MINIMO_GB:g} GB livres no disco.")
             if _deve_parar(live_id, ctx):
                 if fonte:  # sem dados novos o FFmpeg fecha o arquivo direito sozinho
                     media.encerrar(fonte)
@@ -291,7 +301,10 @@ def _falha_gravar(job: dict, msg: str) -> None:
         db.executar("UPDATE projetos SET status='erro', erro=? WHERE id=?", (msg[-1000:], job["projeto_id"]))
 
 
-@jobs.registrar("live_gravar", _falha_gravar, faixa="live")
+LIVES_SIMULTANEAS = 4  # gravar é quase só rede e disco (sem recodificar): várias lives cabem ao mesmo tempo
+
+
+@jobs.registrar("live_gravar", _falha_gravar, faixa="live", trabalhadores=LIVES_SIMULTANEAS)
 def gravar(ctx: Contexto) -> str:
     lid = ctx.params["live_id"]
     live = obter(lid)
@@ -571,6 +584,7 @@ def finalizar(ctx: Contexto) -> str:
         parcial.replace(destino)
     finally:
         media.apagar_arquivo(parcial)
+        media.apagar_arquivo(dir_ / "partes.txt")
 
     info = media.analisar(str(destino))
     db.executar("UPDATE projetos SET caminho_original=?, duracao=?, largura=?, altura=?, fps=? WHERE id=?",

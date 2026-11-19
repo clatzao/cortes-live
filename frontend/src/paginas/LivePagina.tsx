@@ -100,6 +100,7 @@ export default function LivePagina({ id }: { id: number }) {
       />
 
       <div className="estado-live" aria-live="polite">
+        {v.erro && v.status !== "erro" && <div className="aviso aviso-erro" role="alert">{v.erro}</div>}
         {v.parar === 1 && v.status !== "encerrada" && v.status !== "finalizando" && <p className="sutil">Parando a gravação…</p>}
         {analise?.status === "executando" && <Progresso valor={analise.progresso} texto={analise.mensagem} />}
         {gravando && analise?.status !== "executando" && (
