@@ -4,6 +4,7 @@ import { api, avisar, erroTexto, LiveDetalhe } from "../api";
 import CartaoLive from "../componentes/ui/CartaoLive";
 import ItemFeed, { Feed } from "../componentes/ui/ItemFeed";
 import Progresso from "../componentes/Progresso";
+import { custoAnalise } from "../tempo";
 import { paraCartao } from "./Lives";
 
 const DESTAQUE_MS = 4000;
@@ -109,6 +110,7 @@ export default function LivePagina({ id }: { id: number }) {
           </p>
         )}
         {v.ultima_analise && <p className="sutil">Última análise: {v.ultima_analise}</p>}
+        {v.analisado_ate > 0 && <p className="sutil custo-zero">{custoAnalise(v.analisado_ate)}</p>}
         {final && (final.status === "executando" || final.status === "na_fila") && (
           <Progresso valor={final.progresso} texto={final.mensagem ?? "Preparando o projeto"} />
         )}

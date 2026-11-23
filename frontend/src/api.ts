@@ -499,6 +499,7 @@ export const api = {
   limparFila: () => req<{ ok: boolean }>("/api/fila/finalizados", "DELETE"),
   abrirSaida: (id: number) => req<{ ok: boolean }>(`/api/fila/${id}/abrir`, "POST"),
   abrirExportados: () => req<{ ok: boolean }>("/api/abrir-exportados", "POST"),
+  abrirLink: (nome: "gemini_chave") => req<{ ok: boolean; url: string }>(`/api/abrir-link/${nome}`, "POST"),
 
   biblioteca: (f: { busca?: string; formato?: string; projeto?: number }) => {
     const q = new URLSearchParams();

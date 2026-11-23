@@ -15,6 +15,13 @@ export function ler(txt: string): number {
   return limpo.split(":").reduce((tot, p) => tot * 60 + parseFloat(p), 0);
 }
 
+/** "X min analisados · R$ 0": o Cortes Live roda no PC, sem cobrança por minuto (só a cota do Gemini, se usar). */
+export function custoAnalise(seg: number): string {
+  const min = Math.max(1, Math.round(seg / 60));
+  const texto = min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
+  return `${texto} analisados · R$ 0 por minuto (tudo roda no seu PC)`;
+}
+
 export function duracaoCurta(seg: number): string {
   if (seg < 60) return `${seg.toFixed(1)}s`;
   const m = Math.floor(seg / 60);

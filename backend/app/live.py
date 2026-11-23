@@ -36,6 +36,32 @@ POR_ANALISE = 2          # momentos pedidos por análise
 NOTA_MINIMA = 60         # nota mínima do Gemini para virar corte sozinho
 ENERGIA_MINIMA = 35      # sem Gemini: só trechos com bastante volume viram corte
 SOBREPOSICAO = 0.5       # momento que repete mais da metade de um anterior é descartado
+SEM_CORTE_MAX = 480      # sem Gemini: após 8 min de live sem corte, o melhor trecho com fala vira corte
+FALA_MINIMA_GARANTIA = 0.6  # ...desde que tenha fala em pelo menos 60% do tempo
+
+
+def _energia_local(projeto_id: int, energia, de: int, ate: int):
+    """Energia do trecho [de, ate) medida contra o próprio trecho, a partir do volume bruto (ondas.json).
+
+    A energia normal compara com a live toda: depois de um começo barulhento, um trecho calmo chega todo zerado.
+    """
+    saida = energia.copy()
+    try:
+        ondas = json.loads((config.PROJETOS / str(projeto_id) / "ondas.json").read_text())
+        rms = np.asarray(ondas["rms"], dtype=np.float32)
+        taxa = int(ondas["taxa"])
+    except (OSError, ValueError, KeyError):
+        return saida
+    usavel = len(rms) // taxa * taxa
+    por_s = rms[:usavel].reshape(-1, taxa).mean(axis=1) if usavel else np.zeros(0, dtype=np.float32)
+    trecho = por_s[de:min(ate, len(por_s))]
+    if len(trecho) < 10:
+        return saida
+    mediana = float(np.median(trecho))
+    mad = float(np.median(np.abs(trecho - mediana))) * 1.4826 + 1e-3
+    fim = de + len(trecho)
+    saida[de:fim] = np.clip((trecho - mediana) / mad, 0, 8)[: len(saida[de:fim])]
+    return saida
 
 # abaixo disso a gravação para sozinha (o que já foi gravado vira projeto); a variável serve para testes
 DISCO_MINIMO_GB = float(os.environ.get("CORTES_DISCO_MINIMO_GB") or 2)
@@ -469,11 +495,18 @@ def _momentos(p: dict, live: dict, de: float, ate: float, ctx: Contexto) -> tupl
             raise
         except (viral.ErroGemini, requests.RequestException):
             candidatos = []  # cota do dia ou rede: segue só com volume e palavras
+    garantir = False
     if origem == "sinais":
         i0 = int(janela_de)
+        # volume comparado com o próprio trecho (não com a live toda): numa live de volume constante o momento
+        # mais agitado dos últimos minutos ainda se destaca
+        energia = _energia_local(p["id"], energia, i0, int(ate) + 1)
         achados = viral.sugestoes_por_sinais(energia[i0:int(ate) + 1], marc[i0:int(ate) + 1],
                                              fala[i0:int(ate) + 1], mn, mx, POR_ANALISE)
         candidatos = [{**c, "inicio": c["inicio"] + i0, "fim": c["fim"] + i0} for c in achados]
+        # garantia: muito tempo sem corte numa live com fala → o melhor trecho com fala vira corte mesmo sem pico
+        ultimo = db.um("SELECT MAX(fim) AS f FROM sugestoes WHERE projeto_id=?", (p["id"],))["f"] or 0.0
+        garantir = ate - ultimo >= SEM_CORTE_MAX
 
     existentes = [(s["inicio"], s["fim"]) for s in
                   db.listar("SELECT inicio, fim FROM sugestoes WHERE projeto_id=?", (p["id"],))]
@@ -487,7 +520,12 @@ def _momentos(p: dict, live: dict, de: float, ate: float, ctx: Contexto) -> tupl
         trecho = energia[int(ini):int(fim) + 1]
         energia_pct = int(min(100, round(float(trecho.mean()) / 4 * 100))) if len(trecho) else 0
         if origem == "sinais" and energia_pct < ENERGIA_MINIMA:
-            continue
+            falado = float(fala[int(ini):int(fim) + 1].mean()) if fim > ini else 0.0
+            if not (garantir and falado >= FALA_MINIMA_GARANTIA):
+                continue
+            garantir = False  # um corte de garantia por análise
+            c = {**c, "motivo": "O trecho com mais fala e reação dos últimos minutos (escolhido sem o Gemini, "
+                                "por volume, risadas e palavras)."}
         nome = c.get("nome") or f"Momento {formatar(ini)[:8]}"
         sid = db.executar("INSERT INTO sugestoes (projeto_id, inicio, fim, nota, energia, motivo, nome, gancho, "
                           "origem, criado_em) VALUES (?,?,?,?,?,?,?,?,?,?)",

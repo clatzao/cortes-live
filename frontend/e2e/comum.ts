@@ -9,6 +9,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const FIXTURES = path.resolve(__dirname, ".dados", "fixtures");
 export const VIDEO = path.join(FIXTURES, "vídeo de teste ção.mp4");
 export const NAO_VIDEO = path.join(FIXTURES, "nao_e_video.txt");
+/** vídeo com voz sintética do Windows (pode não existir se o PC não tiver síntese de voz) */
+export const VIDEO_FALA = path.join(FIXTURES, "com fala.mp4");
 
 /** T-ERR: falha o teste em erro de console ou resposta 5xx (4xx esperados de casos negativos passam). */
 export function vigiar(page: Page): string[] {

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Play, Scissors, Sparkles, X } from "lucide-react";
 import { api, avisar, Corte, erroTexto, Job, Sugestao } from "../api";
-import { duracaoCurta, formatar } from "../tempo";
+import AvisoGemini from "./AssistenteGemini";
+import { custoAnalise, duracaoCurta, formatar } from "../tempo";
 
 interface Props {
   projetoId: number;
@@ -12,6 +13,8 @@ interface Props {
   onPrevia: (inicio: number, fim: number) => void;
   onCorteCriado: (c: Corte) => void;
   onCortesCriados: (lista: Corte[]) => void;
+  /** duração do vídeo, para a linha de custo */
+  duracao?: number | null;
 }
 
 function corNota(n: number): string {
@@ -20,7 +23,7 @@ function corNota(n: number): string {
   return "nota-baixa";
 }
 
-export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek, onPrevia, onCorteCriado, onCortesCriados }: Props) {
+export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek, onPrevia, onCorteCriado, onCortesCriados, duracao }: Props) {
   const [lista, setLista] = useState<Sugestao[] | null>(null);
   const [min, setMin] = useState(30);
   const [max, setMax] = useState(60);
@@ -133,6 +136,7 @@ export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek,
           <Sparkles size={15} />
           {ativo ? "Analisando…" : lista && lista.length ? "Analisar de novo" : "Encontrar momentos virais"}
         </button>
+        <AvisoGemini motivo="Sem o Gemini, os momentos são escolhidos só por volume e palavras-chave." />
         {!temTranscricao && <p className="sutil">A análise usa a transcrição. Aguarde ela terminar.</p>}
         {ativo && (
           <div className="transcricao-status">
@@ -143,6 +147,7 @@ export default function PainelMomentos({ projetoId, temTranscricao, job, onSeek,
           </div>
         )}
         {job?.status === "concluido" && job.saida && <p className="sutil aviso-analise">{job.saida}</p>}
+        {job?.status === "concluido" && !!duracao && <p className="sutil custo-zero">{custoAnalise(duracao)}</p>}
         {job?.status === "erro" && <p className="erro-texto">{job.mensagem}</p>}
       </div>
 

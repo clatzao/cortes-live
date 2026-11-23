@@ -42,6 +42,20 @@ def abrir_saida(job_id: int):
     return {"ok": True}
 
 
+LINKS_EXTERNOS = {"gemini_chave": "https://aistudio.google.com/apikey"}
+
+
+@router.post("/api/abrir-link/{nome}")
+def abrir_link(nome: str):
+    """Abre no navegador padrão um link da lista fixa (a janela do programa não abre links externos)."""
+    url = LINKS_EXTERNOS.get(nome)
+    if not url:
+        raise HTTPException(404, "Link desconhecido.")
+    import webbrowser
+    webbrowser.open(url)
+    return {"ok": True, "url": url}
+
+
 @router.post("/api/abrir-exportados")
 def abrir_exportados():
     config.EXPORTADOS.mkdir(parents=True, exist_ok=True)

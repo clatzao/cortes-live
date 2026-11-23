@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Loader2, Radio, Trash2 } from "lucide-react";
 import { api, avisar, erroTexto, Idioma, Live } from "../api";
 import SeletorSegmentado from "../componentes/ui/SeletorSegmentado";
+import AvisoGemini from "../componentes/AssistenteGemini";
 import CartaoLive, { DadosLive, EstadoLive } from "../componentes/ui/CartaoLive";
 
 /** Live da API → dados do cartão (o cartão não conhece "cancelada"). */
@@ -83,6 +84,7 @@ export default function Lives() {
           O Cortes Live grava a transmissão, analisa o que foi dito a cada 3 minutos e cria os cortes sozinho. Se o
           canal ainda não estiver no ar, ele espera começar.
         </p>
+        <AvisoGemini motivo="Sem o Gemini, os cortes da live saem só por volume e palavras-chave e ficam bem mais fracos." />
         <form onSubmit={monitorar} className="nova-live-form" noValidate>
           <label htmlFor="canal-live" className="nova-live-rotulo">Canal ou link</label>
           <div className="nova-live-linha">

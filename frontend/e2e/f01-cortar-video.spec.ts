@@ -50,8 +50,15 @@ test.describe("F01 cortar vídeo", () => {
     await semViolacoes(page, "Editor");
 
     await page.getByRole("button", { name: /^Exportar$/ }).click();
-    const job = (await (await request.get("/api/fila")).json()).find((j: { tipo: string; corte_id: number }) => j.tipo === "exportar" && j.corte_id === c.id);
-    const fim = await esperarJob(request, job.id);
+    // o pedido pode ainda não ter chegado ao motor logo depois do clique: espera o job aparecer na fila
+    let job: { id: number } | undefined;
+    await expect
+      .poll(async () => {
+        job = (await (await request.get("/api/fila")).json()).find((j: { tipo: string; corte_id: number }) => j.tipo === "exportar" && j.corte_id === c.id);
+        return !!job;
+      })
+      .toBe(true);
+    const fim = await esperarJob(request, job!.id);
     expect(fim.status, fim.mensagem ?? "").toBe("concluido");
     expect(fs.existsSync(fim.saida!)).toBeTruthy();
 

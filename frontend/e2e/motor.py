@@ -44,6 +44,27 @@ def preparar() -> None:
                     "-i", "sine=f=440:d=12", "-shortest", "-c:v", "libx264", "-preset", "ultrafast",
                     str(FIXTURES / "vídeo de teste ção.mp4")], check=True)
     (FIXTURES / "nao_e_video.txt").write_text("isto não é um vídeo", encoding="utf-8")
+    criar_video_com_fala(ff)
+
+
+def criar_video_com_fala(ff: str) -> None:
+    """Vídeo de ~40 s com voz sintética do Windows (System.Speech), para a transcrição ter o que ler."""
+    wav = FIXTURES / "fala.wav"
+    texto = ("Olá pessoal, sejam bem vindos à live de hoje! Hoje a gente vai jogar a fase mais difícil do jogo. "
+             "Nossa, que jogada incrível! Vocês viram isso? Eu não acredito que deu certo! "
+             "Agora vamos falar das novidades da semana, tem muita coisa boa chegando. "
+             "Valeu demais a todo mundo que está assistindo, deixa o seu comentário aí no chat.") * 2
+    arq_texto = FIXTURES / "fala.txt"
+    arq_texto.write_text(texto, encoding="utf-8-sig")
+    ps = ("Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+          f"$s.SetOutputToWaveFile('{wav}'); $s.Speak((Get-Content -Raw -Encoding UTF8 '{arq_texto}')); "
+          "$s.Dispose()")
+    r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True)
+    if r.returncode != 0 or not wav.is_file():
+        return  # sem síntese de voz: o teste que precisa dela é pulado
+    subprocess.run([ff, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=1280x720:r=30", "-i", str(wav),
+                    "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
+                    str(FIXTURES / "com fala.mp4")], check=True)
 
 
 if __name__ == "__main__":

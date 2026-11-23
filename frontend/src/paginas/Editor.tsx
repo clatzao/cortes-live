@@ -413,6 +413,7 @@ export default function Editor({ id, fila }: { id: number; fila: Job[] }) {
         {aba === "momentos" && (
           <PainelMomentos
             projetoId={id}
+            duracao={projeto?.duracao}
             temTranscricao={temTranscricao}
             job={jobAnalise}
             onSeek={buscar}

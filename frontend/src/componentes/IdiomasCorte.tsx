@@ -3,6 +3,7 @@ import { Download, Languages, Mic, Save } from "lucide-react";
 import { api, avisar, Corte, erroTexto, EstadoIdiomas, IdiomaOpcao, SegmentoTraducao, Voz } from "../api";
 import Progresso from "./Progresso";
 import SeletorSegmentado from "./ui/SeletorSegmentado";
+import AvisoGemini from "./AssistenteGemini";
 import { formatar } from "../tempo";
 
 /** Aba "Idiomas" da janela do corte: traduzir a legenda, revisar, dublar e exportar a versão. */
@@ -143,6 +144,7 @@ export default function IdiomasCorte({ corte, onFechar, onSujo }: {
           </button>
         </div>
         <p className="sutil">A tradução usa o Gemini (Ajustes → IA e hardware). Cada frase mantém o tempo da fala original.</p>
+        <AvisoGemini motivo="A tradução precisa do Gemini." />
 
         {traduzindo && jt && <Progresso valor={jt.progresso} texto={jt.mensagem} />}
         {jt?.status === "erro" && <div className="aviso aviso-erro" role="alert">{jt.mensagem}</div>}

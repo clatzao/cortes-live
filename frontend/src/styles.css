@@ -2276,3 +2276,65 @@ kbd {
   gap: var(--esp-2);
   font-size: var(--fonte-xs);
 }
+
+/* ---------------------------------------------------------------- assistente do Gemini */
+.aviso-gemini {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--destaque-suave);
+  border: 1px solid color-mix(in srgb, var(--destaque) 40%, var(--borda));
+  border-radius: var(--raio-md);
+  color: var(--texto);
+}
+.aviso-gemini > span {
+  flex: 1 1 220px;
+}
+.assistente-gemini {
+  width: min(560px, calc(100vw - 32px));
+}
+.assistente-gemini h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  margin: 0;
+}
+.assistente-gemini .modal-corpo {
+  display: grid;
+  gap: var(--esp-3);
+}
+.assistente-gemini .modal-corpo p {
+  margin: 0;
+}
+.assistente-passos {
+  margin: 0;
+  padding-left: var(--esp-5);
+  display: grid;
+  gap: var(--esp-3);
+}
+.assistente-passos li {
+  display: grid;
+  gap: var(--esp-2);
+}
+.assistente-linha {
+  display: flex;
+  gap: var(--esp-2);
+}
+.assistente-linha input {
+  flex: 1;
+  min-width: 0;
+}
+.assistente-ok {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.custo-zero {
+  color: var(--ok);
+  font-size: var(--fonte-sm);
+}
