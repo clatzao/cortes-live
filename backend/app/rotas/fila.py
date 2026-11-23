@@ -42,7 +42,12 @@ def abrir_saida(job_id: int):
     return {"ok": True}
 
 
-LINKS_EXTERNOS = {"gemini_chave": "https://aistudio.google.com/apikey"}
+LINKS_EXTERNOS = {
+    "gemini_chave": "https://aistudio.google.com/apikey",
+    "google_cloud": "https://console.cloud.google.com/apis/credentials",
+    "tiktok_dev": "https://developers.tiktok.com/apps/",
+    "meta_dev": "https://developers.facebook.com/apps/",
+}
 
 
 @router.post("/api/abrir-link/{nome}")
@@ -51,8 +56,10 @@ def abrir_link(nome: str):
     url = LINKS_EXTERNOS.get(nome)
     if not url:
         raise HTTPException(404, "Link desconhecido.")
+    import os
     import webbrowser
-    webbrowser.open(url)
+    if not os.environ.get("CORTES_SEM_NAVEGADOR"):  # nos testes não abre o navegador de verdade
+        webbrowser.open(url)
     return {"ok": True, "url": url}
 
 

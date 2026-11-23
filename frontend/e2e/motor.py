@@ -72,6 +72,15 @@ if __name__ == "__main__":
     os.environ["CORTES_DADOS"] = str(DADOS)
     os.environ["CORTES_EXPORTADOS"] = str(DADOS / "exportados")
     os.environ["PYTHONIOENCODING"] = "utf-8"
+    # redes sociais: um servidor falso no lugar do YouTube/TikTok/Instagram, agendador rápido, sem abrir navegador
+    sys.path.insert(0, str(AQUI))
+    import redes_falsas
+    porta_redes = int(os.environ.get("PORTA_REDES_TESTE", "8798"))
+    redes_falsas.ligar(porta_redes)
+    os.environ["CORTES_REDES_TESTE"] = f"http://127.0.0.1:{porta_redes}"
+    os.environ["CORTES_AGENDADOR_S"] = "1"
+    os.environ["CORTES_REDES_ESPERA"] = "0"
+    os.environ["CORTES_SEM_NAVEGADOR"] = "1"
     os.chdir(RAIZ / "backend")
     sys.path.insert(0, str(RAIZ / "backend"))
     import uvicorn

@@ -2338,3 +2338,162 @@ kbd {
   color: var(--ok);
   font-size: var(--fonte-sm);
 }
+
+/* ------------------------------------------------ Redes: contas (S23), publicar (S24), posts (S25) */
+.pagina-contas,
+.pagina-posts {
+  display: grid;
+  gap: var(--esp-4);
+  max-width: 860px;
+}
+.secao-contas {
+  display: grid;
+  gap: var(--esp-3);
+  padding: var(--esp-4);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-lg);
+}
+.secao-contas h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  margin: 0;
+  font-size: var(--fonte-lg);
+}
+.secao-contas > .sutil {
+  margin: 0;
+}
+.linha-check {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  cursor: pointer;
+}
+.colar-retorno {
+  display: grid;
+  gap: var(--esp-2);
+}
+.colar-retorno p {
+  margin: 0;
+}
+.app-rede summary {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  cursor: pointer;
+  font-weight: 600;
+}
+.app-rede[open] summary {
+  margin-bottom: var(--esp-3);
+}
+.app-rede .assistente-passos li {
+  display: list-item;
+}
+.campos-app {
+  display: grid;
+  gap: var(--esp-3);
+  margin-top: var(--esp-3);
+}
+.campos-app label,
+.campo-bloco {
+  display: grid;
+  gap: var(--esp-1);
+  font-size: var(--fonte-sm);
+}
+.campo-bloco textarea {
+  resize: vertical;
+}
+.janela-publicar {
+  width: min(560px, calc(100vw - 32px));
+}
+.janela-publicar .modal-corpo {
+  display: grid;
+  gap: var(--esp-3);
+}
+.contas-escolha {
+  display: grid;
+  gap: var(--esp-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-md);
+  padding: var(--esp-3);
+  margin: 0;
+}
+.lista-posts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--esp-2);
+}
+.pagina-posts h2 {
+  font-size: var(--fonte-md);
+  margin: var(--esp-2) 0;
+}
+.item-post {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--esp-3);
+  align-items: start;
+  padding: var(--esp-3);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-lg);
+}
+.item-post-rede {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--raio-pill);
+  background: var(--superficie-2);
+}
+.item-post-texto {
+  display: grid;
+  gap: var(--esp-1);
+  min-width: 0;
+}
+.item-post-texto strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-post-acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-1);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.metricas-post {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-3);
+  font-size: var(--fonte-sm);
+}
+.editar-horario {
+  display: grid;
+  gap: var(--esp-2);
+  margin-top: var(--esp-2);
+}
+@media (max-width: 640px) {
+  .item-post {
+    grid-template-columns: auto 1fr;
+  }
+  .item-post-acoes {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 600px) {
+  /* 5 itens no menu: no celular ele rola dentro de si, sem empurrar a página para o lado */
+  .topo nav {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topo nav a {
+    padding: 5px 10px;
+    white-space: nowrap;
+  }
+}

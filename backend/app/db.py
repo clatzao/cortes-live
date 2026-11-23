@@ -190,6 +190,59 @@ CREATE TABLE IF NOT EXISTS corte_brolls (
 );
 CREATE INDEX IF NOT EXISTS corte_brolls_corte ON corte_brolls (corte_id);
 CREATE INDEX IF NOT EXISTS corte_brolls_midia ON corte_brolls (midia_id);
+
+-- Redes sociais (marco 6): contas ligadas por login oficial; os tokens ficam cifrados em dados/cofre (DPAPI)
+CREATE TABLE IF NOT EXISTS contas_sociais (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rede TEXT NOT NULL CHECK (rede IN ('youtube','tiktok','instagram')),
+    id_externo TEXT NOT NULL,
+    nome TEXT NOT NULL,
+    avatar_url TEXT,
+    escopos TEXT NOT NULL DEFAULT '[]',
+    expira_em REAL,
+    status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa','expirada','revogada')),
+    so_privado INTEGER NOT NULL DEFAULT 0,
+    criado_em REAL NOT NULL,
+    atualizado_em REAL NOT NULL,
+    UNIQUE (rede, id_externo)
+);
+CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conta_id INTEGER NOT NULL REFERENCES contas_sociais(id) ON DELETE CASCADE,
+    exportacao_id INTEGER REFERENCES exportacoes(id) ON DELETE SET NULL,
+    arquivo TEXT NOT NULL,
+    duracao_s REAL NOT NULL DEFAULT 0,
+    titulo TEXT NOT NULL DEFAULT '',
+    descricao TEXT NOT NULL DEFAULT '',
+    privacidade TEXT NOT NULL DEFAULT 'publico' CHECK (privacidade IN ('publico','nao_listado','privado')),
+    agendado_para REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'agendado'
+        CHECK (status IN ('agendado','enviando','publicado','falhou','cancelado')),
+    tentativas INTEGER NOT NULL DEFAULT 0,
+    proxima_tentativa REAL,
+    job_id INTEGER,
+    chave_idempotencia TEXT NOT NULL UNIQUE,
+    id_externo TEXT,
+    url TEXT,
+    erro TEXT,
+    publicado_em REAL,
+    criado_em REAL NOT NULL,
+    atualizado_em REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS posts_conta ON posts (conta_id);
+CREATE INDEX IF NOT EXISTS posts_exportacao ON posts (exportacao_id);
+CREATE INDEX IF NOT EXISTS posts_fila ON posts (status, agendado_para);
+-- o mesmo arquivo não vai duas vezes para a mesma conta enquanto não falhar ou for cancelado
+CREATE UNIQUE INDEX IF NOT EXISTS posts_sem_duplicar ON posts (conta_id, arquivo)
+    WHERE status IN ('agendado','enviando','publicado');
+CREATE TABLE IF NOT EXISTS metricas_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    coletado_em REAL NOT NULL,
+    views INTEGER, likes INTEGER, comentarios INTEGER,
+    compartilhamentos INTEGER, salvos INTEGER, alcance INTEGER
+);
+CREATE INDEX IF NOT EXISTS metricas_post_data ON metricas_posts (post_id, coletado_em DESC);
 """
 )
 _conn.commit()

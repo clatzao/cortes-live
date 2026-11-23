@@ -16,7 +16,8 @@ Use apenas lives suas ou com permissão do criador.
 - [Como usar](#como-usar-resumo)
 - [Atalhos do editor](#atalhos-do-editor)
 - [Hardware](#hardware) · [Legendas](#legendas) · [Formatos e marca](#formatos-e-marca) ·
-  [Momentos virais](#momentos-virais-gemini) · [Thumbnails](#thumbnails)
+  [Momentos virais](#momentos-virais-gemini) · [Thumbnails](#thumbnails) ·
+  [Publicar nas redes](#publicar-nas-redes-youtube-tiktok-instagram)
 - [Onde ficam os arquivos](#onde-ficam-os-arquivos)
 - [Estrutura do código](#estrutura-do-código) · [Desenvolvimento](#desenvolvimento)
 
@@ -44,6 +45,8 @@ Use apenas lives suas ou com permissão do criador.
   - editor com camadas, exportado em PNG.
 - **Padrão dos cortes**: estilo de legenda, formatos e extras com que todo corte novo nasce.
 - **Exportação em fila**, com "Exportar todos". Os arquivos vão organizados em `Vídeos\Cortes Live`.
+- **Publicar e agendar** no YouTube Shorts, TikTok e Instagram Reels (até 30 dias), direto da Biblioteca, com
+  as métricas de cada post. Fechar a janela deixa o programa na bandeja para os agendados saírem no horário.
 - Detecta o hardware e se adapta a ele: NVENC, Quick Sync, AMF ou processador, e o modelo do Whisper que cabe
   na sua placa.
 - Visual escuro estilo estúdio; o botão de sol/lua troca para o claro.
@@ -203,6 +206,27 @@ Numa GTX 1060, o large-v3-turbo deve levar bem menos (não testado ainda).
 - "Salvar design como template" guarda o layout em proporções, então ele funciona nos três tamanhos.
 - Imagens adicionadas no editor ficam em `dados/thumb_imagens` para reusar.
 
+## Publicar nas redes (YouTube, TikTok, Instagram)
+
+Só pelas APIs oficiais, com um app de desenvolvedor criado por você em cada rede (grátis). O passo a passo de
+cada uma está em **Ajustes → Contas**, junto com o endereço de retorno que você cadastra no app.
+
+- **YouTube**: projeto no Google Cloud com a YouTube Data API v3 e uma credencial OAuth "App para computador".
+  Publique o app (em modo Teste o acesso expira a cada 7 dias). A cota grátis dá cerca de 6 envios por dia.
+- **TikTok**: app com Login Kit e Content Posting API. Até o TikTok aprovar o app (auditoria), os vídeos saem
+  só como privados.
+- **Instagram**: conta Profissional e um app da Meta com a "API com login do Instagram". Como a Meta só aceita
+  retorno https, no fim do login a página não abre: copie o endereço da barra do navegador e cole no programa.
+  Só publica Reels públicos.
+
+Na **Biblioteca**, o botão **Publicar** de cada vídeo publica agora ou agenda numa ou mais contas. A página
+**Posts** mostra os próximos e os publicados, com views, curtidas e comentários (atualizados a cada 6 h). Se a
+rede falhar, o programa tenta de novo sozinho (3 vezes) e mostra o motivo.
+
+Os agendados só saem com o programa aberto ou na bandeja (perto do relógio). Fechar a janela (X) não fecha o
+programa: para sair de vez, use **Sair** no ícone da bandeja. Em **Ajustes → Contas** dá para fazer ele abrir
+sozinho na bandeja ao ligar o PC. Os acessos às contas ficam cifrados (DPAPI do Windows) em `dados/cofre`.
+
 ## Onde ficam os arquivos
 
 - `Vídeos\Cortes Live\<live>\<corte (id)>\`: cortes prontos, um arquivo por formato, o `.srt` e as thumbnails
@@ -234,6 +258,8 @@ backend/                 servidor local (Python 3.12, FastAPI, gerenciado pelo u
   app/hardware.py        detecção de placa e codificadores
   app/cortes.py          criação de cortes com o padrão do usuário
   app/jobs.py, db.py     fila em segundo plano e banco SQLite
+  app/redes/             YouTube, TikTok e Instagram (login oficial, envio, métricas)
+  app/publicar.py        posts, agendador e jobs de publicar; app/cofre.py guarda os acessos cifrados
 frontend/                site (React + Vite + TypeScript); o build fica em frontend/dist
   src/paginas/           Início (projetos), Editor, Fila e Ajustes (Padrão dos cortes, Legendas,
                          Marca do canal, IA e hardware)

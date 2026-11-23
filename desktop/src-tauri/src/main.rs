@@ -14,7 +14,9 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use tauri::{Manager, RunEvent, State};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Manager, RunEvent, State, WindowEvent};
 use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(windows)]
@@ -150,6 +152,8 @@ fn preparar_e_ligar(app: &tauri::AppHandle, m: &Motor) -> Result<(), String> {
         .env("CORTES_DADOS", p.base.join("dados"))
         .env("CORTES_FERRAMENTAS", p.ferramentas())
         .env("CORTES_PORTA", porta.to_string())
+        // o motor grava "iniciar com o Windows" (Ajustes) apontando para este executável
+        .env("CORTES_EXE", std::env::current_exe().unwrap_or_default())
         .env("PYTHONDONTWRITEBYTECODE", "1")
         .env("PYTHONUTF8", "1")
         .stdin(Stdio::null())
@@ -436,20 +440,67 @@ fn prender_no_job(filho: &Child) {
     }
 }
 
+/// Mostra a janela (vinda da bandeja, minimizada ou atrás de outras).
+fn mostrar(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+/// Ícone na bandeja: o programa continua rodando com a janela fechada (publica no horário, grava lives).
+fn criar_bandeja(app: &tauri::App) -> tauri::Result<()> {
+    let abrir = MenuItem::with_id(app, "abrir", "Abrir o Cortes Live", true, None::<&str>)?;
+    let sair = MenuItem::with_id(app, "sair", "Sair (para de publicar e gravar)", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&abrir, &sair])?;
+    let mut bandeja = TrayIconBuilder::with_id("principal")
+        .tooltip("Cortes Live")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, e| match e.id.as_ref() {
+            "abrir" => mostrar(app),
+            "sair" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|bandeja, e| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+                mostrar(bandeja.app_handle());
+            }
+        });
+    if let Some(icone) = app.default_window_icon() {
+        bandeja = bandeja.icon(icone.clone());
+    }
+    bandeja.build(app)?;
+    Ok(())
+}
+
 fn main() {
     let motor: Compartilhado = Arc::new(Motor::default());
+    // aberto pelo Windows ao ligar o PC (Ajustes → iniciar com o Windows): começa só na bandeja
+    let na_bandeja = std::env::args().any(|a| a == "--bandeja");
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // abrir de novo só traz a janela que já está aberta para a frente
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.set_focus();
-            }
+            // abrir de novo só traz a janela que já está aberta (ou na bandeja) para a frente
+            mostrar(app);
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(motor.clone())
         .invoke_handler(tauri::generate_handler![estado, tentar_de_novo, abrir_registro])
-        .setup(|app| {
+        .on_window_event(|janela, evento| {
+            // fechar (X) só esconde: o motor segue publicando os agendados e gravando as lives
+            if let WindowEvent::CloseRequested { api, .. } = evento {
+                api.prevent_close();
+                let _ = janela.hide();
+            }
+        })
+        .setup(move |app| {
+            criar_bandeja(app)?;
+            if na_bandeja {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.hide();
+                }
+            }
             let m = app.state::<Compartilhado>().inner().clone();
             iniciar(app.handle().clone(), m);
             Ok(())

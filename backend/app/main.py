@@ -6,7 +6,8 @@ from . import config, hardware, jobs, legendas
 from . import tarefas  # noqa: F401  (registra os jobs na fila)
 from . import live  # noqa: F401  (registra os jobs do monitor de live)
 from . import idiomas  # noqa: F401  (registra os jobs de tradução e dublagem)
-from .rotas import biblioteca, cortes, fila, idiomas as rotas_idiomas, legendas as rotas_legendas, lives, marca, midias, momentos, projetos, sistema, thumbs
+from . import publicar  # noqa: F401  (registra os jobs das redes sociais)
+from .rotas import biblioteca, cortes, fila, idiomas as rotas_idiomas, legendas as rotas_legendas, lives, marca, midias, momentos, projetos, redes, sistema, thumbs
 
 app = FastAPI(title="Cortes Live")
 
@@ -15,9 +16,10 @@ app = FastAPI(title="Cortes Live")
 def _inicio() -> None:
     hardware.detectar_em_segundo_plano()
     jobs.iniciar()
+    publicar.iniciar()  # agendador dos posts (depois da fila, que devolve os jobs interrompidos)
 
 
-for modulo in (sistema, projetos, cortes, rotas_legendas, marca, momentos, fila, thumbs, lives, biblioteca, midias, rotas_idiomas):
+for modulo in (sistema, projetos, cortes, rotas_legendas, marca, momentos, fila, thumbs, lives, biblioteca, midias, rotas_idiomas, redes):
     app.include_router(modulo.router)
 
 # fontes usadas nas legendas, servidas para o editor de thumb desenhar com as mesmas

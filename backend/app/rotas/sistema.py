@@ -36,6 +36,13 @@ class Ajustes(BaseModel):
     estilo_padrao: str | None = None
     legenda_padrao: bool | None = None
     auto_cortes: bool | None = None
+    youtube_cliente_id: str | None = None
+    youtube_cliente_segredo: str | None = None
+    tiktok_cliente_chave: str | None = None
+    tiktok_cliente_segredo: str | None = None
+    instagram_app_id: str | None = None
+    instagram_app_segredo: str | None = None
+    iniciar_com_windows: bool | None = None
 
 
 @router.get("/api/ajustes")
@@ -48,7 +55,10 @@ def ver_ajustes():
 
 @router.put("/api/ajustes")
 def salvar_ajustes(dados: Ajustes):
-    ajustes.salvar(dados.model_dump(exclude_none=True))
+    try:
+        ajustes.salvar(dados.model_dump(exclude_none=True))
+    except (ValueError, OSError) as e:
+        raise HTTPException(400, str(e)) from e
     return ver_ajustes()
 
 

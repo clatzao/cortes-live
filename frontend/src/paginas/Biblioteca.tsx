@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { FolderOpen, Search, Trash2 } from "lucide-react";
+import { FolderOpen, Search, Send, Trash2 } from "lucide-react";
 import { api, avisar, erroTexto, ItemBiblioteca } from "../api";
 import { duracaoCurta } from "../tempo";
+import JanelaPublicar from "../componentes/JanelaPublicar";
 
 function tamanho(bytes: number): string {
   return bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`;
@@ -13,6 +14,7 @@ export default function Biblioteca() {
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [formato, setFormato] = useState("");
+  const [publicar, setPublicar] = useState<ItemBiblioteca | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -98,6 +100,10 @@ export default function Biblioteca() {
               <button className="btn" onClick={() => abrir(i)} disabled={!i.existe}>
                 <FolderOpen size={15} aria-hidden="true" /> Mostrar na pasta
               </button>
+              <button className="btn btn-primario" onClick={() => setPublicar(i)} disabled={!i.existe}
+                aria-label={`Publicar ${i.corte_nome || "corte"}`}>
+                <Send size={15} aria-hidden="true" /> Publicar
+              </button>
               <button className="btn-icone" onClick={() => tirar(i)} title="Tirar da lista (o arquivo continua na pasta)"
                 aria-label={`Tirar ${i.corte_nome} da lista`}>
                 <Trash2 size={15} aria-hidden="true" />
@@ -106,6 +112,7 @@ export default function Biblioteca() {
           </article>
         ))}
       </div>
+      {publicar && <JanelaPublicar item={publicar} aoFechar={() => setPublicar(null)} />}
     </div>
   );
 }

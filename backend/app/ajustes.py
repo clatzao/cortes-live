@@ -28,7 +28,18 @@ PADRAO = {
     "estilo_padrao": "classico",
     "legenda_padrao": True,
     "auto_cortes": False,        # última escolha da caixinha "criar cortes automaticamente" ao importar
+    # Redes sociais: apps de desenvolvedor criados por você (os segredos nunca voltam inteiros para o site)
+    "youtube_cliente_id": "",
+    "youtube_cliente_segredo": "",
+    "tiktok_cliente_chave": "",
+    "tiktok_cliente_segredo": "",
+    "instagram_app_id": "",
+    "instagram_app_segredo": "",
+    "iniciar_com_windows": False,  # abrir escondido na bandeja ao ligar o PC (para os agendados saírem)
 }
+# campos de texto das redes; os que terminam em "_segredo" são mascarados em publico()
+CAMPOS_REDES = ("youtube_cliente_id", "youtube_cliente_segredo", "tiktok_cliente_chave", "tiktok_cliente_segredo",
+                "instagram_app_id", "instagram_app_segredo")
 
 
 def ler() -> dict:
@@ -81,6 +92,13 @@ def salvar(novos: dict) -> dict:
     for k in ("legenda_padrao", "auto_cortes"):
         if k in novos and novos[k] is not None:
             atual[k] = bool(novos[k])
+    for k in CAMPOS_REDES:
+        if novos.get(k) is not None:
+            atual[k] = str(novos[k]).strip()[:500]
+    if novos.get("iniciar_com_windows") is not None:
+        from . import inicio_windows
+        inicio_windows.aplicar(bool(novos["iniciar_com_windows"]))  # falha aqui não grava o ajuste
+        atual["iniciar_com_windows"] = bool(novos["iniciar_com_windows"])
     _gravar(atual)
     return atual
 
@@ -91,4 +109,9 @@ def publico() -> dict:
     chave = a.pop("gemini_chave")
     a["gemini_tem_chave"] = bool(chave)
     a["gemini_chave_final"] = chave[-4:] if len(chave) >= 8 else ""
+    for k in CAMPOS_REDES:
+        if k.endswith("_segredo"):
+            a[k + "_tem"] = bool(a.pop(k))
+    from . import inicio_windows
+    a["iniciar_com_windows_disponivel"] = inicio_windows.disponivel()
     return a

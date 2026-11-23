@@ -7,6 +7,7 @@ import Fila from "./paginas/Fila";
 import Ajustes, { AbaAjustes } from "./paginas/Ajustes";
 import Lives from "./paginas/Lives";
 import Biblioteca from "./paginas/Biblioteca";
+import Posts from "./paginas/Posts";
 import LivePagina from "./paginas/LivePagina";
 import { lazy, Suspense } from "react";
 
@@ -20,6 +21,7 @@ type Rota =
   | { pagina: "ajustes"; aba: AbaAjustes }
   | { pagina: "lives" }
   | { pagina: "biblioteca" }
+  | { pagina: "posts" }
   | { pagina: "live"; id: number }
   | { pagina: "design" };
 
@@ -31,6 +33,7 @@ function lerRota(): Rota {
   if (ml) return { pagina: "live", id: Number(ml[1]) };
   if (h.startsWith("lives")) return { pagina: "lives" };
   if (h.startsWith("biblioteca")) return { pagina: "biblioteca" };
+  if (h.startsWith("posts")) return { pagina: "posts" };
   if (h.startsWith("fila")) return { pagina: "fila" };
   if (import.meta.env.DEV && h.startsWith("design")) return { pagina: "design" };
   // endereços antigos continuam funcionando
@@ -38,6 +41,7 @@ function lerRota(): Rota {
   if (h.startsWith("legendas") || h.startsWith("ajustes/legendas")) return { pagina: "ajustes", aba: "legendas" };
   if (h.startsWith("marca") || h.startsWith("ajustes/marca")) return { pagina: "ajustes", aba: "marca" };
   if (h.startsWith("ajustes/midias")) return { pagina: "ajustes", aba: "midias" };
+  if (h.startsWith("ajustes/contas")) return { pagina: "ajustes", aba: "contas" };
   if (h.startsWith("config") || h.startsWith("ajustes")) return { pagina: "ajustes", aba: "sistema" };
   return { pagina: "inicio" };
 }
@@ -151,6 +155,9 @@ export default function App() {
           <a href="#/biblioteca" className={rota.pagina === "biblioteca" ? "ativo" : ""}>
             Biblioteca
           </a>
+          <a href="#/posts" className={rota.pagina === "posts" ? "ativo" : ""}>
+            Posts
+          </a>
           <a href="#/ajustes/padrao" className={rota.pagina === "ajustes" ? "ativo" : ""}>
             Ajustes
           </a>
@@ -181,6 +188,7 @@ export default function App() {
         {rota.pagina === "fila" && <Fila fila={fila} />}
         {rota.pagina === "lives" && <Lives />}
         {rota.pagina === "biblioteca" && <Biblioteca />}
+        {rota.pagina === "posts" && <Posts />}
         {rota.pagina === "live" && <LivePagina key={rota.id} id={rota.id} />}
         {rota.pagina === "ajustes" && <Ajustes aba={rota.aba} hw={hw} onHw={setHw} />}
         {rota.pagina === "design" && Design && (

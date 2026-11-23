@@ -69,6 +69,14 @@ export interface Ajustes {
   legenda_padrao: boolean;
   auto_cortes: boolean;
   download_qualidade: string;
+  youtube_cliente_id: string;
+  youtube_cliente_segredo_tem: boolean;
+  tiktok_cliente_chave: string;
+  tiktok_cliente_segredo_tem: boolean;
+  instagram_app_id: string;
+  instagram_app_segredo_tem: boolean;
+  iniciar_com_windows: boolean;
+  iniciar_com_windows_disponivel: boolean;
   opcoes: { whisper_modelo: string[]; whisper_dispositivo: string[]; download_qualidade: string[]; export_resolucao: string[] };
 }
 
@@ -344,6 +352,68 @@ export interface ItemBiblioteca {
   existe: boolean;
 }
 
+export type NomeRede = "youtube" | "tiktok" | "instagram";
+export type Privacidade = "publico" | "nao_listado" | "privado";
+
+export interface InfoRede {
+  nome: NomeRede;
+  titulo: string;
+  retorno: string;
+  retorno_automatico: boolean;
+  privacidades: Privacidade[];
+  configurada: boolean;
+  campo_id: string;
+  campo_segredo: string;
+  app_id: string;
+}
+
+export interface ContaSocial {
+  id: number;
+  rede: NomeRede;
+  rede_titulo: string;
+  nome: string;
+  avatar_url: string | null;
+  status: "ativa" | "expirada" | "revogada";
+  so_privado: number;
+  agendados: number;
+}
+
+export interface MetricasPost {
+  coletado_em: number;
+  views: number | null;
+  likes: number | null;
+  comentarios: number | null;
+  compartilhamentos: number | null;
+  salvos: number | null;
+  alcance: number | null;
+}
+
+export interface Post {
+  id: number;
+  conta_id: number;
+  rede: NomeRede;
+  conta_nome: string;
+  conta_status: string;
+  so_privado: number;
+  exportacao_id: number | null;
+  arquivo: string;
+  corte_nome: string | null;
+  projeto_nome: string | null;
+  titulo: string;
+  descricao: string;
+  privacidade: Privacidade;
+  agendado_para: number;
+  status: "agendado" | "enviando" | "publicado" | "falhou" | "cancelado";
+  tentativas: number;
+  proxima_tentativa: number | null;
+  url: string | null;
+  erro: string | null;
+  publicado_em: number | null;
+  envio_progresso: number | null;
+  envio_mensagem: string | null;
+  metricas: MetricasPost | null;
+}
+
 export interface LiveDetalhe extends Live {
   disco_livre_gb: number;
   cortes: CorteLive[];
@@ -429,6 +499,9 @@ export const api = {
   ajustes: () => req<Ajustes>("/api/ajustes"),
   salvarAjustes: (dados: Partial<Omit<Ajustes, "opcoes" | "gemini_tem_chave" | "gemini_chave_final">> & {
     gemini_chave?: string;
+    youtube_cliente_segredo?: string;
+    tiktok_cliente_segredo?: string;
+    instagram_app_segredo?: string;
   }) => req<Ajustes>("/api/ajustes", "PUT", dados),
   testarGemini: () => req<{ ok: boolean; modelo_escolhido: string; modelos: string[] }>("/api/ajustes/testar-gemini", "POST"),
   analisar: (projetoId: number, dados: { min?: number; max?: number; qtd?: number }) =>
@@ -499,7 +572,7 @@ export const api = {
   limparFila: () => req<{ ok: boolean }>("/api/fila/finalizados", "DELETE"),
   abrirSaida: (id: number) => req<{ ok: boolean }>(`/api/fila/${id}/abrir`, "POST"),
   abrirExportados: () => req<{ ok: boolean }>("/api/abrir-exportados", "POST"),
-  abrirLink: (nome: "gemini_chave") => req<{ ok: boolean; url: string }>(`/api/abrir-link/${nome}`, "POST"),
+  abrirLink: (nome: "gemini_chave" | "google_cloud" | "tiktok_dev" | "meta_dev") => req<{ ok: boolean; url: string }>(`/api/abrir-link/${nome}`, "POST"),
 
   biblioteca: (f: { busca?: string; formato?: string; projeto?: number }) => {
     const q = new URLSearchParams();
@@ -527,6 +600,24 @@ export const api = {
   criarLive: (entrada: string, idioma: Idioma) => req<Live>("/api/lives", "POST", { entrada, idioma }),
   pararLive: (id: number) => req<Live>(`/api/lives/${id}/parar`, "POST"),
   removerLive: (id: number) => req<{ ok: boolean }>(`/api/lives/${id}`, "DELETE"),
+
+  redes: () => req<InfoRede[]>("/api/redes"),
+  conectarRede: (rede: NomeRede) => req<{ state: string; url_login: string; retorno: string }>(`/api/redes/${rede}/conectar`, "POST"),
+  estadoLogin: (state: string) =>
+    req<{ status: "aguardando" | "ok" | "erro" | "expirado"; msg: string; conta_id: number | null }>(`/api/redes/login/${state}`),
+  colarRetorno: (endereco: string) => req<{ ok: boolean }>("/api/redes/login/colar", "POST", { endereco }),
+  contas: () => req<ContaSocial[]>("/api/contas"),
+  desconectarConta: (id: number) => req<{ ok: boolean }>(`/api/contas/${id}`, "DELETE"),
+  posts: () => req<Post[]>("/api/posts"),
+  criarPosts: (dados: { exportacao_id: number; conta_ids: number[]; titulo: string; descricao: string;
+    privacidade: Privacidade; agendado_para: number | null }) => req<Post[]>("/api/posts", "POST", dados),
+  mudarPost: (id: number, dados: { titulo?: string; descricao?: string; privacidade?: Privacidade; agendado_para?: number }) =>
+    req<Post>(`/api/posts/${id}`, "PATCH", dados),
+  cancelarPost: (id: number) => req<Post>(`/api/posts/${id}/cancelar`, "POST"),
+  tentarPost: (id: number) => req<Post>(`/api/posts/${id}/tentar`, "POST"),
+  removerPost: (id: number) => req<{ ok: boolean }>(`/api/posts/${id}`, "DELETE"),
+  abrirPost: (id: number) => req<{ ok: boolean; url: string }>(`/api/posts/${id}/abrir`, "POST"),
+  atualizarMetricas: () => req<{ job_id: number | null }>("/api/posts/metricas", "POST"),
 };
 
 /** Trilha do enquadramento automático, se ainda vale para o trecho atual do corte. */
