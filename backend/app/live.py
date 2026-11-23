@@ -38,6 +38,10 @@ ENERGIA_MINIMA = 35      # sem Gemini: só trechos com bastante volume viram cor
 SOBREPOSICAO = 0.5       # momento que repete mais da metade de um anterior é descartado
 SEM_CORTE_MAX = 480      # sem Gemini: após 8 min de live sem corte, o melhor trecho com fala vira corte
 FALA_MINIMA_GARANTIA = 0.6  # ...desde que tenha fala em pelo menos 60% do tempo
+IDIOMA_PEDACO = 10       # sem Gemini: o idioma falado é conferido em pedaços de 10 s do trecho...
+IDIOMA_MAX = 60          # ...nos primeiros 60 s dele
+IDIOMA_CERTEZA = 0.6     # pedaço conta como outro idioma com essa certeza
+IDIOMA_FRACAO = 0.4      # trecho com 40% dos pedaços em outro idioma é descartado (fala do jogo/vídeo)
 
 
 def _energia_local(projeto_id: int, energia, de: int, ate: int):
@@ -452,19 +456,54 @@ def _transcrever(p: dict, de: float, audio: np.ndarray, ctx: Contexto, final: bo
     return len(novos)
 
 
+def _outro_idioma(p: dict, live: dict, ini: float, fim: float, ctx: Contexto) -> str | None:
+    """Idioma falado no trecho, se boa parte dele for claramente outro que não o da live (ex.: cena do jogo).
+
+    Com o idioma fixo o Whisper traduz a fala estrangeira e o texto parece português; a detecção de idioma
+    do próprio modelo, sobre o áudio, percebe. Vai em pedaços de 10 s porque numa cena o streamer comenta por
+    cima: medido numa live real, a cena deu outro idioma em ~60% dos pedaços e o streamer falando, em ~5%.
+    Devolve None quando é o idioma da live ou na dúvida.
+    """
+    if p["idioma"] == "misto":
+        return None
+    fim = min(fim, ini + IDIOMA_MAX)
+    try:
+        audio = _audio_do_trecho(live, ini, fim, pasta(live) / f"live_idioma_{ctx.id}.raw", ctx)
+        passo = IDIOMA_PEDACO * transcricao.TAXA
+        pedacos = [audio[i:i + passo] for i in range(0, len(audio), passo) if len(audio) - i >= passo // 2]
+        if not pedacos:
+            return None
+        modelo, _chave = transcricao._carregar(ctx)
+        outros: list[str] = []
+        for pedaco in pedacos:
+            ctx.checar()
+            idioma, prob, _todos = modelo.detect_language(pedaco)
+            if idioma != p["idioma"] and prob >= IDIOMA_CERTEZA:
+                outros.append(idioma)
+    except Cancelado:
+        raise
+    except Exception:  # noqa: BLE001 - na dúvida o trecho segue como antes
+        return None
+    if len(outros) < IDIOMA_FRACAO * len(pedacos):
+        return None
+    return max(set(outros), key=outros.count)
+
+
 def _sobrepoe(a: tuple[float, float], b: tuple[float, float]) -> bool:
     inter = min(a[1], b[1]) - max(a[0], b[0])
     return inter > SOBREPOSICAO * min(a[1] - a[0], b[1] - b[0])
 
 
-def _momentos(p: dict, live: dict, de: float, ate: float, ctx: Contexto) -> tuple[int, str]:
-    """Acha momentos nos últimos minutos e já cria os cortes. Devolve (cortes criados, de onde vieram)."""
+def _momentos(p: dict, live: dict, de: float, ate: float, ctx: Contexto) -> tuple[int, str, int]:
+    """Acha momentos nos últimos minutos e já cria os cortes.
+
+    Devolve (cortes criados, de onde vieram, trechos descartados por serem falados em outro idioma)."""
     arq = transcricao.caminho(p["id"])
     segmentos = [s for s in json.loads(arq.read_text(encoding="utf-8")).get("segmentos", []) if s.get("texto")]
     janela_de = max(0.0, ate - CONTEXTO)
     no_contexto = [s for s in segmentos if s["fim"] > janela_de]
     if sum(s["fim"] - s["inicio"] for s in no_contexto) < 15:
-        return 0, "pouca fala"
+        return 0, "pouca fala", 0
     aj = ajustes.ler()
     mn, mx = int(aj["viral_min"]), max(int(aj["viral_min"]), int(aj["viral_max"]))
     palavras = sorted((w for s in segmentos for w in s.get("palavras", [])), key=lambda w: w[0])
@@ -510,7 +549,7 @@ def _momentos(p: dict, live: dict, de: float, ate: float, ctx: Contexto) -> tupl
 
     existentes = [(s["inicio"], s["fim"]) for s in
                   db.listar("SELECT inicio, fim FROM sugestoes WHERE projeto_id=?", (p["id"],))]
-    criados = 0
+    criados = descartados = 0
     for c in candidatos:
         ini, fim = viral.ajustar_limites(c["inicio"], c["fim"], segmentos, palavras, ate, mn, mx)
         if fim - ini < min(mn, 5) or fim <= de - mx:  # curto demais, ou só repete o que já foi analisado
@@ -523,6 +562,11 @@ def _momentos(p: dict, live: dict, de: float, ate: float, ctx: Contexto) -> tupl
             falado = float(fala[int(ini):int(fim) + 1].mean()) if fim > ini else 0.0
             if not (garantir and falado >= FALA_MINIMA_GARANTIA):
                 continue
+        # sem Gemini não há quem leia a fala: um diálogo do jogo em outro idioma não é o streamer
+        if origem == "sinais" and _outro_idioma(p, live, ini, fim, ctx):
+            descartados += 1
+            continue
+        if origem == "sinais" and energia_pct < ENERGIA_MINIMA:
             garantir = False  # um corte de garantia por análise
             c = {**c, "motivo": "O trecho com mais fala e reação dos últimos minutos (escolhido sem o Gemini, "
                                 "por volume, risadas e palavras)."}
@@ -536,7 +580,7 @@ def _momentos(p: dict, live: dict, de: float, ate: float, ctx: Contexto) -> tupl
             db.executar("UPDATE cortes SET origem='live' WHERE id=?", (cid,))
             criados += 1
         existentes.append((ini, fim))
-    return criados, origem
+    return criados, origem, descartados
 
 
 @jobs.registrar("live_analisar", faixa="pesada")
@@ -565,11 +609,13 @@ def analisar(ctx: Contexto) -> str:
     del audio
     _atualizar(lid, analisado_ate=ate)
     ctx.progresso(0.85, "Procurando momentos", forcar=True)
-    criados, origem = _momentos(p, live, de, ate, ctx)
+    criados, origem, descartados = _momentos(p, live, de, ate, ctx)
     total = db.um("SELECT COUNT(*) AS n FROM cortes WHERE projeto_id=? AND origem='live'", (p["id"],))["n"]
     fonte = {"gemini": "Gemini", "sinais": "volume e palavras", "pouca fala": "pouca fala no trecho"}[origem]
     resumo = (f"{formatar(de)[:8]}–{formatar(ate)[:8]}: {frases} frase(s), "
               f"{criados} corte(s) novo(s) ({fonte}).")
+    if descartados:
+        resumo += f" {descartados} trecho(s) em outro idioma (fala do jogo ou vídeo) ignorado(s)."
     _atualizar(lid, cortes_criados=total, ultima_analise=resumo)
     if final:
         _fechar_transcricao(p["id"])
