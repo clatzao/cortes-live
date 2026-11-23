@@ -480,6 +480,7 @@ export const api = {
     return URL.createObjectURL(await r.blob());
   },
   enquadrarCorte: (id: number) => req<Corte>(`/api/cortes/${id}/enquadrar`, "POST"),
+  salvarTrilha: (id: number, pontos: [number, number][]) => req<Corte>(`/api/cortes/${id}/trilha`, "PUT", pontos),
   apagarCorte: (id: number) => req<{ ok: boolean }>(`/api/cortes/${id}`, "DELETE"),
   exportarCorte: (id: number, formatos?: string[], idioma?: string) =>
     req<Job[]>(`/api/cortes/${id}/exportar`, "POST", { ...(formatos ? { formatos } : {}), ...(idioma ? { idioma } : {}) }),

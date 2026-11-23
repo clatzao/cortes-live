@@ -2236,3 +2236,43 @@ kbd {
 .dublagem audio {
   width: 100%;
 }
+
+/* ---------------------------------------------------------------- editor da trilha de foco */
+.editor-trilha {
+  display: grid;
+  gap: var(--esp-1);
+  margin: var(--esp-2) 0;
+}
+.editor-trilha svg {
+  width: 100%;
+  height: 64px;
+  background: var(--campo);
+  border: 1px solid var(--borda-campo);
+  border-radius: var(--raio-md);
+  cursor: crosshair;
+  touch-action: none;
+}
+.editor-trilha svg:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+.trilha-linha {
+  fill: none;
+  stroke: var(--destaque);
+  stroke-width: 2;
+}
+.trilha-meio {
+  stroke: var(--borda);
+  stroke-dasharray: 4 6;
+}
+.trilha-agora {
+  stroke: var(--tl-cabeca);
+  stroke-width: 1.5;
+}
+.trilha-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--esp-2);
+  font-size: var(--fonte-xs);
+}

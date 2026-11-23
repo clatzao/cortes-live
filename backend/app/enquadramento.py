@@ -31,6 +31,7 @@ TROCA_S = 1.5            # outro rosto precisa dominar este tempo para a câmera
 ZONA_MORTA = 0.03        # movimentos menores que isto (fração da largura) são ignorados
 AMORTECER = 0.25         # quanto do caminho até o alvo anda a cada amostra (0-1)
 MESMO_ROSTO = 0.08       # rostos a menos disto (fração da largura) são considerados o mesmo
+SALTO_CORTE = 0.25       # mudança maior que isto vira corte seco em vez de movimento
 _lock = threading.Lock()
 
 
@@ -146,7 +147,9 @@ def calcular(origem: str, inicio: float, duracao: float, largura: int, altura: i
     atual = primeiro
     for t, x in brutos:
         destino = x if x is not None else atual
-        if abs(destino - atual) > ZONA_MORTA:
+        if abs(destino - atual) > SALTO_CORTE:
+            atual = destino  # trocou de pessoa: corte seco (atravessar a tela no meio fica feio)
+        elif abs(destino - atual) > ZONA_MORTA:
             atual += (destino - atual) * AMORTECER
         suave.append((t, atual))
     # reamostra a cada PASSO_TRILHA e arredonda

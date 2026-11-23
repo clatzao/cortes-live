@@ -127,6 +127,20 @@ def recalcular_enquadramento(corte_id: int):
     return _corte_completo(_corte(corte_id))
 
 
+@router.put("/api/cortes/{corte_id}/trilha")
+def salvar_trilha(corte_id: int, pontos: list[tuple[float, float]]):
+    """Trilha do enquadramento ajustada à mão: [[t, x], ...] (t relativo ao corte, x de 0 a 1)."""
+    c = _corte(corte_id)
+    dur = c["fim"] - c["inicio"]
+    limpos = sorted((round(min(max(0.0, t), dur), 2), round(min(max(0.0, x), 1.0), 4)) for t, x in pontos)
+    if len(limpos) < 2 or len(limpos) > 20000:
+        raise HTTPException(400, "A trilha precisa ter entre 2 e 20 mil pontos.")
+    db.executar("UPDATE cortes SET enquadramento='auto', trilha_foco=? WHERE id=?",
+                (db.json_dump({"inicio": c["inicio"], "fim": c["fim"], "pontos": [list(p) for p in limpos],
+                               "editada": True}), corte_id))
+    return _corte_completo(_corte(corte_id))
+
+
 class PalavrasLegenda(BaseModel):
     # [início, fim, texto] com tempo absoluto (da live)
     palavras: list[tuple[float, float, str]]

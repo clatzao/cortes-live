@@ -3,6 +3,7 @@ import { Crosshair, Lock, RotateCcw } from "lucide-react";
 import { api, avisar, Corte, erroTexto, focoEm, Formato, Marca, Projeto, Recursos, trilhaDoCorte } from "../api";
 import SeletorSegmentado from "./ui/SeletorSegmentado";
 import BrollCorte from "./BrollCorte";
+import EditorTrilha from "./EditorTrilha";
 import { BrollItem } from "../api";
 import { formatar } from "../tempo";
 import LayoutFacecam from "./LayoutFacecam";
@@ -38,7 +39,9 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
   useEffect(() => {
     api.brolls(corte.id).then(setBrolls).catch(() => {});
   }, [corte.id]);
-  const trilha = trilhaDoCorte(corteAtual);
+  const trilhaSalva = trilhaDoCorte(corteAtual);
+  const [trilhaEditada, setTrilhaEditada] = useState<[number, number][] | null>(null);
+  const trilha = trilhaEditada ?? trilhaSalva;
   const [gancho, setGancho] = useState(corte.gancho ?? "");
   const [recursos, setRecursos] = useState<Recursos>(corte.recursos_efetivos);
   const [verFormato, setVerFormato] = useState(corte.formatos_efetivos[0] ?? "vertical_crop");
@@ -59,7 +62,11 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
       const meu = ++pedido.current;
       setGerando(true);
       api
-        .previaFormato({ corte_id: corte.id, formato: verFormato, t, crop_x: cropX, enquadramento: enq, gancho, recursos })
+        .previaFormato(
+          trilhaEditada && enq === "auto"
+            ? { corte_id: corte.id, formato: verFormato, t, crop_x: focoEm(trilhaEditada, t), enquadramento: "fixo", gancho, recursos }
+            : { corte_id: corte.id, formato: verFormato, t, crop_x: cropX, enquadramento: enq, gancho, recursos },
+        )
         .then((u) => {
           if (meu !== pedido.current) return URL.revokeObjectURL(u); // chegou uma mais nova
           if (ultima.current) URL.revokeObjectURL(ultima.current);
@@ -71,10 +78,10 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
         .finally(() => setGerando(false));
     }, 250);
     return () => clearTimeout(id);
-  }, [corte.id, verFormato, t, cropX, enq, trilha !== null, gancho, recursos, projetoAtual.layout_efetivo]);
+  }, [corte.id, verFormato, t, cropX, enq, trilha, gancho, recursos, projetoAtual.layout_efetivo]);
 
   // Enquadramento automático salvo mas ainda sem trilha: acompanha até o cálculo terminar.
-  const esperandoTrilha = corteAtual.enquadramento === "auto" && trilha === null;
+  const esperandoTrilha = corteAtual.enquadramento === "auto" && trilhaSalva === null;
   useEffect(() => {
     if (!esperandoTrilha) return;
     const id = setInterval(() => {
@@ -125,8 +132,10 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
       const c = await api.editarCorte(corte.id, { formatos: sel, crop_x: cropX, enquadramento: enq,
         gancho_midia_id: hook ?? 0, gancho: gancho.trim() || null, recursos });
       setBrolls(await api.salvarBrolls(corte.id, brolls));
-      setCorteAtual(c);
-      onAlterado(c);
+      const final = enq === "auto" && trilhaEditada ? await api.salvarTrilha(corte.id, trilhaEditada) : c;
+      setTrilhaEditada(null);
+      setCorteAtual(final);
+      onAlterado(final);
       setSujo(false);
       if (fechar) onFechar();
       return true;
@@ -155,6 +164,7 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
 
   const frac = larguraRecorte();
   const centro = enq === "auto" && trilha ? focoEm(trilha, t) : cropX;
+  const corteEditado = !!corteAtual.trilha_foco && corteAtual.trilha_foco.includes('"editada": true');
   const esquerda = Math.min(1 - frac, Math.max(0, centro - frac / 2));
 
   async function recalcular() {
@@ -230,9 +240,15 @@ export default function OpcoesCorte({ corte, projeto, formatos, marca, onFechar,
                     Centralizar
                   </button>
                 ) : (
-                  <button className="btn btn-peq" onClick={recalcular} disabled={esperandoTrilha}>
-                    <RotateCcw size={13} aria-hidden="true" /> Recalcular
-                  </button>
+                  <>
+                    {trilha && (
+                      <EditorTrilha pontos={trilha} duracao={corte.fim - corte.inicio} t={t} onT={setT}
+                        onPontos={(p) => (setTrilhaEditada(p), setSujo(true))} />
+                    )}
+                    <button className="btn btn-peq" onClick={() => (setTrilhaEditada(null), recalcular())} disabled={esperandoTrilha}>
+                      <RotateCcw size={13} aria-hidden="true" /> {trilhaEditada || corteEditado ? "Voltar ao automático" : "Recalcular"}
+                    </button>
+                  </>
                 )}
               </div>
             )}
