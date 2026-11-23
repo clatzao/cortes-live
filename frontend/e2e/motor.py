@@ -81,6 +81,7 @@ if __name__ == "__main__":
     os.environ["CORTES_AGENDADOR_S"] = "1"
     os.environ["CORTES_REDES_ESPERA"] = "0"
     os.environ["CORTES_SEM_NAVEGADOR"] = "1"
+    os.environ["CORTES_SEM_AVISOS"] = "1"
     os.chdir(RAIZ / "backend")
     sys.path.insert(0, str(RAIZ / "backend"))
     import uvicorn

@@ -224,7 +224,9 @@ Na **Biblioteca**, o botão **Publicar** de cada vídeo publica agora ou agenda 
 rede falhar, o programa tenta de novo sozinho (3 vezes) e mostra o motivo.
 
 Os agendados só saem com o programa aberto ou na bandeja (perto do relógio). Fechar a janela (X) não fecha o
-programa: para sair de vez, use **Sair** no ícone da bandeja. Em **Ajustes → Contas** dá para fazer ele abrir
+programa: para sair de vez, use **Sair** no ícone da bandeja. Com ele na bandeja, um aviso do Windows conta quando
+um corte é exportado, uma transcrição fica pronta, a live começa, ganha cortes ou acaba, e quando um post sai ou
+falha (dá para desligar em **Ajustes → Contas**). Em **Ajustes → Contas** dá para fazer ele abrir
 sozinho na bandeja ao ligar o PC. Os acessos às contas ficam cifrados (DPAPI do Windows) em `dados/cofre`.
 
 ## Onde ficam os arquivos

@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 import requests
 
-from . import ajustes, config, cortes, db, jobs, legendas, media, transcricao, viral
+from . import ajustes, config, cortes, db, jobs, legendas, media, notificacoes, transcricao, viral
 from .jobs import Cancelado, Contexto
 from .tempo import formatar
 
@@ -213,6 +213,8 @@ def _gravar_parte(live_id: int, info: dict, ctx: Contexto) -> None:
     if ordem == 1:
         db.executar("UPDATE projetos SET caminho_original=? WHERE id=?", (str(arquivo), live["projeto_id"]))
     _atualizar(live_id, status="gravando")  # o canal está no ar: a tela já mostra "ao vivo" enquanto conecta
+    if ordem == 1:
+        notificacoes.avisar(f"live_inicio_{live_id}", "A live começou", f"{live['canal']}: gravando e cortando.")
     titulo = (info.get("description") if live["plataforma"] == "twitch" else None) or info.get("title")
     if titulo:
         _atualizar(live_id, titulo=str(titulo)[:200])
@@ -610,6 +612,9 @@ def analisar(ctx: Contexto) -> str:
     _atualizar(lid, analisado_ate=ate)
     ctx.progresso(0.85, "Procurando momentos", forcar=True)
     criados, origem, descartados = _momentos(p, live, de, ate, ctx)
+    if criados:
+        notificacoes.avisar(f"live_cortes_{lid}", "Cortes novos na live", f"{live['canal']}: {criados} corte(s) novo(s).",
+                            "Cortes novos na live ({n} análises)")
     total = db.um("SELECT COUNT(*) AS n FROM cortes WHERE projeto_id=? AND origem='live'", (p["id"],))["n"]
     fonte = {"gemini": "Gemini", "sinais": "volume e palavras", "pouca fala": "pouca fala no trecho"}[origem]
     resumo = (f"{formatar(de)[:8]}–{formatar(ate)[:8]}: {frases} frase(s), "

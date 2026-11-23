@@ -43,6 +43,7 @@ class Ajustes(BaseModel):
     instagram_app_id: str | None = None
     instagram_app_segredo: str | None = None
     iniciar_com_windows: bool | None = None
+    notificacoes: bool | None = None
 
 
 @router.get("/api/ajustes")

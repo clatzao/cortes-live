@@ -59,6 +59,14 @@ export default function Contas() {
     }
   }
 
+  async function avisosDoWindows(ligar: boolean) {
+    try {
+      setAj(await api.salvarAjustes({ notificacoes: ligar }));
+    } catch (e) {
+      avisar(erroTexto(e), "erro");
+    }
+  }
+
   return (
     <div className="pagina-contas">
       <h1>Contas das redes</h1>
@@ -70,7 +78,7 @@ export default function Contas() {
 
       {aj && (
         <section className="secao-contas" aria-labelledby="titulo-agendamento">
-          <h2 id="titulo-agendamento">Agendamentos</h2>
+          <h2 id="titulo-agendamento">Bandeja e avisos</h2>
           <label className="linha-check">
             <input type="checkbox" checked={aj.iniciar_com_windows} disabled={!aj.iniciar_com_windows_disponivel}
               onChange={(e) => iniciarComWindows(e.target.checked)} />
@@ -81,6 +89,11 @@ export default function Contas() {
               ? "Os posts agendados só saem com o programa aberto ou na bandeja (fechar a janela deixa ele na bandeja, perto do relógio). Os atrasados saem assim que ele abrir."
               : "Disponível no programa instalado."}
           </p>
+          <label className="linha-check">
+            <input type="checkbox" checked={aj.notificacoes} disabled={!aj.notificacoes_disponivel}
+              onChange={(e) => avisosDoWindows(e.target.checked)} />
+            Avisar no Windows quando exportar, publicar, a live começar ou acabar, ou der erro
+          </label>
         </section>
       )}
 

@@ -77,6 +77,8 @@ export interface Ajustes {
   instagram_app_segredo_tem: boolean;
   iniciar_com_windows: boolean;
   iniciar_com_windows_disponivel: boolean;
+  notificacoes: boolean;
+  notificacoes_disponivel: boolean;
   opcoes: { whisper_modelo: string[]; whisper_dispositivo: string[]; download_qualidade: string[]; export_resolucao: string[] };
 }
 

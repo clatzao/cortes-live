@@ -115,6 +115,7 @@ def _laco(faixa: str) -> None:
             saida = handler(ctx)
             db.executar("UPDATE jobs SET status='concluido', progresso=1, mensagem='Concluído', saida=?, "
                         "atualizado_em=? WHERE id=?", (saida, db.agora(), job["id"]))
+            _avisar(job, True, saida or "")
         except Cancelado:
             db.executar("UPDATE jobs SET status='cancelado', mensagem='Cancelado', atualizado_em=? WHERE id=?",
                         (db.agora(), job["id"]))
@@ -125,6 +126,16 @@ def _laco(faixa: str) -> None:
             db.executar("UPDATE jobs SET status='erro', mensagem=?, atualizado_em=? WHERE id=?",
                         (msg[-2000:], db.agora(), job["id"]))
             _chamar_hook(job, msg)
+            _avisar(job, False, msg[-300:])
+
+
+def _avisar(job: dict, ok: bool, texto: str) -> None:
+    """Notificação do Windows para o que terminou (o programa pode estar só na bandeja)."""
+    try:
+        from . import notificacoes
+        notificacoes.job_terminou(job, ok, texto)
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
 
 
 def _chamar_hook(job: dict, msg: str) -> None:

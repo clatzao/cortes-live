@@ -36,6 +36,7 @@ PADRAO = {
     "instagram_app_id": "",
     "instagram_app_segredo": "",
     "iniciar_com_windows": False,  # abrir escondido na bandeja ao ligar o PC (para os agendados saírem)
+    "notificacoes": True,          # aviso do Windows quando exporta, publica, a live começa/acaba ou dá erro
 }
 # campos de texto das redes; os que terminam em "_segredo" são mascarados em publico()
 CAMPOS_REDES = ("youtube_cliente_id", "youtube_cliente_segredo", "tiktok_cliente_chave", "tiktok_cliente_segredo",
@@ -89,7 +90,7 @@ def salvar(novos: dict) -> dict:
         atual["viral_auto"] = bool(novos["viral_auto"])
     if isinstance(novos.get("estilo_padrao"), str) and novos["estilo_padrao"].strip():
         atual["estilo_padrao"] = novos["estilo_padrao"].strip()[:60]
-    for k in ("legenda_padrao", "auto_cortes"):
+    for k in ("legenda_padrao", "auto_cortes", "notificacoes"):
         if k in novos and novos[k] is not None:
             atual[k] = bool(novos[k])
     for k in CAMPOS_REDES:
@@ -114,4 +115,6 @@ def publico() -> dict:
             a[k + "_tem"] = bool(a.pop(k))
     from . import inicio_windows
     a["iniciar_com_windows_disponivel"] = inicio_windows.disponivel()
+    from . import notificacoes
+    a["notificacoes_disponivel"] = notificacoes.disponivel()
     return a

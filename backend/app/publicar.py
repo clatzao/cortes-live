@@ -11,7 +11,7 @@ import traceback
 import uuid
 from pathlib import Path
 
-from . import db, jobs
+from . import db, jobs, notificacoes
 from .jobs import Cancelado, Contexto
 from .redes import REDES, ErroRede, base
 
@@ -205,6 +205,7 @@ def _falhou(post_id: int, msg: str, tentar: bool) -> None:
     else:
         db.executar("UPDATE posts SET status='falhou', tentativas=?, erro=?, job_id=NULL, atualizado_em=? WHERE id=?",
                     (n, msg, db.agora(), post_id))
+        notificacoes.avisar("post_erro", "Um post não saiu", msg, "{n} posts não saíram")
 
 
 def _falha_job(job: dict, msg: str) -> None:
@@ -246,6 +247,8 @@ def publicar(ctx: Contexto) -> str:
         db.executar("UPDATE posts SET status='publicado', id_externo=?, url=?, erro=NULL, publicado_em=?, job_id=NULL, "
                     "atualizado_em=? WHERE id=?", (id_externo, link, db.agora(), db.agora(), pid))
     aviso = " (estava cancelado, mas a rede já tinha recebido)" if atual and atual["status"] == "cancelado" else ""
+    notificacoes.avisar("post_ok", f"Publicado no {rede.titulo}", f"{p['titulo'] or Path(p['arquivo']).stem} ({conta['nome']})",
+                        "{n} posts publicados")
     return f"Publicado no {rede.titulo}{aviso}: {link or id_externo}"
 
 
