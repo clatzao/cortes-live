@@ -181,6 +181,7 @@ def apagar_corte(corte_id: int):
 
 class PedidoExportacao(BaseModel):
     formatos: list[str] | None = None  # None = os formatos marcados no corte
+    idioma: str | None = Field(default=None, pattern=r"^[a-z]{2}$")  # versão traduzida/dublada
 
 
 @router.post("/api/cortes/{corte_id}/exportar")
@@ -195,10 +196,15 @@ def exportar_corte(corte_id: int, dados: PedidoExportacao | None = None):
     elif p["status"] != "pronto":
         raise HTTPException(400, "Aguarde o projeto terminar de processar.")
     lista = _validar_formatos(dados.formatos) if dados and dados.formatos else tarefas.formatos_do_corte(c, p)
+    idioma = dados.idioma if dados else None
+    if idioma:
+        from .. import idiomas
+        if not idiomas.traducao(corte_id, idioma):
+            raise HTTPException(400, "Traduza o corte para esse idioma antes de exportar.")
     criados = []
     for fmt in lista:
         jid = jobs.enfileirar("exportar", projeto_id=p["id"], corte_id=corte_id,
-                              params={"nome": c["nome"], "formato": fmt})
+                              params={"nome": c["nome"], "formato": fmt, "idioma": idioma})
         criados.append(db.um("SELECT * FROM jobs WHERE id=?", (jid,)))
     return criados
 

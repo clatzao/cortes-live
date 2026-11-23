@@ -2184,3 +2184,55 @@ kbd {
 .broll-linha input[type="number"] {
   width: 72px;
 }
+
+/* ---------------------------------------------------------------- idiomas do corte (S21) */
+.idiomas-corte {
+  display: grid;
+  gap: var(--esp-3);
+  align-content: start;
+}
+.idiomas-corte p,
+.idiomas-corte h3 {
+  margin: 0;
+}
+.idiomas-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-3);
+  align-items: end;
+}
+.idiomas-linha label {
+  display: grid;
+  gap: var(--esp-1);
+}
+.traducao,
+.dublagem {
+  display: grid;
+  gap: var(--esp-2);
+}
+.lista-traducao {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--esp-1);
+  max-height: 320px;
+  overflow: auto;
+}
+.lista-traducao li {
+  display: flex;
+  gap: var(--esp-2);
+  align-items: center;
+}
+.lista-traducao time {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: var(--fonte-sm);
+  flex: none;
+}
+.lista-traducao input {
+  flex: 1;
+  min-width: 0;
+}
+.dublagem audio {
+  width: 100%;
+}

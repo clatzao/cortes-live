@@ -1,19 +1,21 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Captions, Image as IconeImagem, Smartphone, X } from "lucide-react";
+import { Captions, Image as IconeImagem, Languages, Smartphone, X } from "lucide-react";
 import { Corte, Estilo, Formato, Marca, Projeto } from "../api";
 import { duracaoCurta } from "../tempo";
 import EditorLegenda from "./EditorLegenda";
 import OpcoesCorte from "./OpcoesCorte";
+import IdiomasCorte from "./IdiomasCorte";
 
 // o editor de thumb (Konva) só é baixado quando a aba é aberta
 const EditorThumb = lazy(() => import("../thumb/EditorThumb"));
 
-export type AbaCorte = "legenda" | "formatos" | "thumb";
+export type AbaCorte = "legenda" | "formatos" | "idiomas" | "thumb";
 
 const ABAS: { id: AbaCorte; nome: string; dica: string; Icone: typeof Captions }[] = [
   { id: "legenda", nome: "Legenda", dica: "Estilo e texto da legenda", Icone: Captions },
   { id: "formatos", nome: "Formatos e extras", dica: "9:16, 1:1, 16:9, recorte, gancho, logo, música…", Icone: Smartphone },
+  { id: "idiomas", nome: "Idiomas", dica: "Traduzir a legenda e dublar", Icone: Languages },
   { id: "thumb", nome: "Thumbnail", dica: "Capa do vídeo", Icone: IconeImagem },
 ];
 
@@ -88,6 +90,7 @@ export default function JanelaCorte(p: Props) {
           <OpcoesCorte corte={p.corte} projeto={p.projeto} formatos={p.formatos} marca={p.marca} onFechar={fechar}
             onAlterado={p.onAlterado} onProjeto={p.onProjeto} onSujo={marcarSujo} />
         )}
+        {aba === "idiomas" && <IdiomasCorte corte={p.corte} onFechar={fechar} onSujo={marcarSujo} />}
         {aba === "thumb" && (
           <Suspense fallback={<p className="painel-pad sutil">Abrindo o editor de thumbnail…</p>}>
             <EditorThumb corte={p.corte} onSujo={marcarSujo} />

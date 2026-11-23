@@ -132,6 +132,7 @@ class Montagem:
     # B-roll: (arquivo, início, fim, modo) com tempos relativos ao corte; modo tela_cheia ou metade
     brolls: list[tuple[str, float, float, str]] = field(default_factory=list)
     previa_t: float = 0.0         # instante da prévia (para mostrar o B-roll que estiver no ar)
+    dublagem: tuple[str, float] | None = None  # (wav da fala dublada, volume do áudio original 0-1)
     fonte_reduzida: bool = False  # prévia lendo o proxy: escala de volta para largura x altura
 
 
@@ -216,6 +217,16 @@ def comando(m: Montagem, video_args: list[str], destino: str, previa: bool = Fal
         i = entrada("-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=48000:cl=stereo")
         filtros.append(f"[{i}:a]{norm_audio}[am0]")
 
+    if m.dublagem:
+        arq_d, vol_o = m.dublagem
+        i = entrada("-i", arq_d)
+        filtros.append(f"[am0]volume={vol_o:.3f}[am0o]")
+        filtros.append(f"[{i}:a]{norm_audio},apad[dub]")
+        filtros.append("[am0o][dub]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[am0d]")
+        filtros.append("[am0d]anull[am0x]")
+    else:
+        filtros.append("[am0]anull[am0x]")
+
     if m.musica:
         arq, vol, abaixar = m.musica
         i = entrada("-stream_loop", "-1", "-t", f"{dur:.3f}", "-i", arq)
@@ -223,14 +234,14 @@ def comando(m: Montagem, video_args: list[str], destino: str, previa: bool = Fal
         filtros.append(f"[{i}:a]{norm_audio},volume={vol:.3f},afade=t=in:d=0.8,afade=t=out:st={fade:.3f}:d=1.5[mus]")
         if abaixar:
             # a voz controla um compressor na música: quando alguém fala, a música abaixa
-            filtros.append("[am0]asplit=2[voz][sc]")
+            filtros.append("[am0x]asplit=2[voz][sc]")
             # medido: ~10 dB a menos na música durante a fala; volume cheio nas pausas
             filtros.append("[mus][sc]sidechaincompress=threshold=0.005:ratio=20:attack=15:release=500[musd]")
             filtros.append("[voz][musd]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[am]")
         else:
-            filtros.append("[am0][mus]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[am]")
+            filtros.append("[am0x][mus]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[am]")
     else:
-        filtros.append("[am0]anull[am]")
+        filtros.append("[am0x]anull[am]")
 
     partes_v, partes_a = [], []
     total = dur

@@ -243,34 +243,36 @@ def exportar(ctx: Contexto) -> str:
         raise RuntimeError(f"Formato desconhecido: {fmt}")
 
     pasta = pasta_saida(p, c)
-    destino = pasta / f"{nome_legivel(formatos.FORMATOS[fmt]['nome'].replace(':', 'x'), 40)}.mp4"
+    idioma = ctx.params.get("idioma") or None
+    sufixo = f" ({idioma.upper()})" if idioma else ""
+    destino = pasta / f"{nome_legivel(formatos.FORMATOS[fmt]['nome'].replace(':', 'x'), 40)}{sufixo}.mp4"
     parcial = destino.with_name(destino.stem + ".parcial.mp4")
     temporaria = pasta_projeto(p["id"]) / f"export_{c['id']}_{ctx.id}"
     try:
-        montagem = preparar_montagem(c, p, fmt, temporaria, ctx)
+        montagem = preparar_montagem(c, p, fmt, temporaria, ctx, idioma=idioma)
         args, total = formatos.comando(montagem, hardware.args_video("final"), str(parcial))
         media.rodar_ffmpeg(args, total, ctx, 0.25, 0.75, f"Renderizando {formatos.FORMATOS[fmt]['nome']}")
         parcial.replace(destino)
         srt = temporaria / "legenda.srt"
         if srt.exists():
             shutil.copyfile(srt, destino.with_suffix(".srt"))
-        registrar_exportacao(c, p, fmt, destino, ctx.id)
+        registrar_exportacao(c, p, fmt, destino, ctx.id, idioma)
     finally:
         media.apagar_arquivo(parcial)
         shutil.rmtree(temporaria, ignore_errors=True)
     return str(destino)
 
 
-def registrar_exportacao(c: dict, p: dict, fmt: str, destino: Path, job_id: int) -> None:
+def registrar_exportacao(c: dict, p: dict, fmt: str, destino: Path, job_id: int, idioma: str | None = None) -> None:
     """Guarda o arquivo na Biblioteca (exportar de novo o mesmo corte/formato só atualiza a linha)."""
     db.executar(
         "INSERT INTO exportacoes (corte_id, projeto_id, projeto_nome, corte_nome, formato, resolucao, caminho, "
-        "duracao_s, tamanho_bytes, job_id, criado_em) VALUES (?,?,?,?,?,?,?,?,?,?,?) "
+        "duracao_s, tamanho_bytes, job_id, criado_em, idioma) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
         "ON CONFLICT(caminho) DO UPDATE SET corte_id=excluded.corte_id, projeto_nome=excluded.projeto_nome, "
         "corte_nome=excluded.corte_nome, resolucao=excluded.resolucao, duracao_s=excluded.duracao_s, "
         "tamanho_bytes=excluded.tamanho_bytes, job_id=excluded.job_id, criado_em=excluded.criado_em",
         (c["id"], p["id"], p["nome"], c["nome"], fmt, ajustes.ler()["export_resolucao"], str(destino),
-         round(c["fim"] - c["inicio"], 2), destino.stat().st_size, job_id, db.agora()))
+         round(c["fim"] - c["inicio"], 2), destino.stat().st_size, job_id, db.agora(), idioma))
 
 
 def layout_do_projeto(p: dict, m: dict | None = None) -> dict:
@@ -297,7 +299,8 @@ class _SemContexto:
 
 
 def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | None = None,
-                      previa_t: float | None = None, sobrescrever: dict | None = None) -> formatos.Montagem:
+                      previa_t: float | None = None, sobrescrever: dict | None = None,
+                      idioma: str | None = None) -> formatos.Montagem:
     """Monta tudo o que entra no vídeo (legenda, gancho, logo, música, intro/outro).
 
     previa_t: instante (relativo ao corte) para uma prévia de um quadro; sobrescrever: valores ainda
@@ -335,6 +338,11 @@ def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | N
 
     if c["com_legenda"]:
         palavras = palavras_do_corte(c)
+        if idioma:  # versão em outro idioma: legenda traduzida
+            from . import idiomas
+            palavras = idiomas.palavras_traduzidas(c["id"], idioma)
+            if palavras is None:
+                raise RuntimeError("Este corte ainda não foi traduzido para esse idioma.")
         if palavras is None and not previa:
             raise RuntimeError("A transcrição deste projeto ainda não terminou. Aguarde ou desligue a legenda "
                                "deste corte.")
@@ -384,6 +392,11 @@ def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | N
         if hook and Path(hook["caminho"]).is_file():
             mt.hook = formatos.Extra(hook["caminho"], hook["duracao_s"] or 0, bool(hook["tem_audio"]))
     mt.previa_t = previa_t or 0.0
+    if idioma and not previa:
+        from . import idiomas
+        d = idiomas.dublagem(c["id"], idioma)
+        if d:
+            mt.dublagem = (d["caminho_audio"], idiomas.VOLUME_ORIGINAL.get(d["audio_original"], 0.15))
     if c.get("id"):
         for b in db.listar("SELECT b.*, m.caminho FROM corte_brolls b JOIN midias m ON m.id = b.midia_id "
                            "WHERE b.corte_id=? ORDER BY b.inicio_s", (c["id"],)):

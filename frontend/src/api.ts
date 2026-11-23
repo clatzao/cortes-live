@@ -274,6 +274,34 @@ export interface CorteLive {
   exportavel: boolean;
 }
 
+export interface IdiomaOpcao {
+  codigo: string;
+  nome: string;
+}
+
+export interface SegmentoTraducao {
+  inicio: number;
+  fim: number;
+  texto: string;
+}
+
+export interface Voz {
+  codigo: string;
+  idioma: string;
+  regiao: string;
+  nome: string;
+  qualidade: string;
+  tamanho_mb: number;
+  baixada: boolean;
+}
+
+export interface EstadoIdiomas {
+  traducoes: { idioma: string; segmentos: SegmentoTraducao[]; editada: number; atualizado_em: number }[];
+  dublagens: { idioma: string; voz: string; audio_original: string; existe: boolean }[];
+  job_traducao: (JobResumo & { saida: string | null }) | null;
+  job_dublagem: (JobResumo & { saida: string | null }) | null;
+}
+
 export type TipoMidia = "gancho" | "broll";
 
 export interface Midia {
@@ -453,8 +481,17 @@ export const api = {
   },
   enquadrarCorte: (id: number) => req<Corte>(`/api/cortes/${id}/enquadrar`, "POST"),
   apagarCorte: (id: number) => req<{ ok: boolean }>(`/api/cortes/${id}`, "DELETE"),
-  exportarCorte: (id: number, formatos?: string[]) =>
-    req<Job[]>(`/api/cortes/${id}/exportar`, "POST", formatos ? { formatos } : {}),
+  exportarCorte: (id: number, formatos?: string[], idioma?: string) =>
+    req<Job[]>(`/api/cortes/${id}/exportar`, "POST", { ...(formatos ? { formatos } : {}), ...(idioma ? { idioma } : {}) }),
+  idiomas: () => req<IdiomaOpcao[]>("/api/idiomas"),
+  vozes: (idioma: string) => req<Voz[]>(`/api/vozes?idioma=${idioma}`),
+  idiomasDoCorte: (id: number) => req<EstadoIdiomas>(`/api/cortes/${id}/idiomas`),
+  traduzirCorte: (id: number, idioma: string) => req<Job>(`/api/cortes/${id}/traducoes`, "POST", { idioma }),
+  salvarTraducao: (id: number, idioma: string, segmentos: SegmentoTraducao[]) =>
+    req<unknown>(`/api/cortes/${id}/traducoes/${idioma}`, "PUT", segmentos),
+  dublarCorte: (id: number, dados: { idioma: string; voz: string; audio_original: "abaixar" | "silenciar" }) =>
+    req<Job>(`/api/cortes/${id}/dublagens`, "POST", dados),
+  urlDublagem: (id: number, idioma: string) => `/api/cortes/${id}/dublagens/${idioma}/audio`,
 
   fila: () => req<Job[]>("/api/fila"),
   cancelarJob: (id: number) => req<{ ok: boolean }>(`/api/fila/${id}/cancelar`, "POST"),
