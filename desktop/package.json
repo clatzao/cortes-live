@@ -1,7 +1,7 @@
 {
   "name": "cortes-live-desktop",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "scripts": {
     "preparar": "node preparar.mjs",
     "dev": "node preparar.mjs && tauri dev",
