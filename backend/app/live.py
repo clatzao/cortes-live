@@ -43,6 +43,7 @@ ATIVOS = ("aguardando", "gravando", "reconectando", "finalizando")
 _OFFLINE = re.compile(r"not (currently )?live|is offline|offline|will begin|has not started|"
                       r"no video formats|live event|premieres in|is not live", re.IGNORECASE)
 _SEM_COR = re.compile(r"\x1b\[[0-9;]*m")
+_NAO_EXISTE = re.compile(r"does not exist|channel not found|user not found|HTTP Error 404", re.IGNORECASE)
 _modelo_gemini: dict[str, str] = {}
 
 
@@ -149,6 +150,8 @@ def consultar(url: str) -> dict | None:
         msg = _SEM_COR.sub("", str(e))
         if _OFFLINE.search(msg):
             return None
+        if _NAO_EXISTE.search(msg):
+            raise RuntimeError("Esse canal não existe. Confira o nome ou o link.") from e
         raise RuntimeError(f"Não consegui abrir o canal: {msg}") from e
     if info.get("_type") == "playlist" or not info.get("is_live") and info.get("live_status") != "is_live":
         return None

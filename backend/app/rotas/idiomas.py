@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from .. import db, idiomas, jobs
+from .. import ajustes, db, idiomas, jobs
 from .comum import _corte
 
 router = APIRouter()
@@ -63,6 +63,8 @@ def estado(corte_id: int):
 @router.post("/api/cortes/{corte_id}/traducoes")
 def traduzir(corte_id: int, dados: PedidoTraducao):
     c = _corte(corte_id)
+    if not ajustes.ler()["gemini_chave"]:  # avisa na hora em vez de entrar na fila e falhar depois
+        raise HTTPException(400, "A tradução usa o Gemini. Configure a chave em Ajustes → IA e hardware.")
     jid = jobs.enfileirar("traduzir", projeto_id=c["projeto_id"], corte_id=corte_id, params={"idioma": dados.idioma},
                           mensagem="Aguardando para traduzir")
     return db.um("SELECT * FROM jobs WHERE id=?", (jid,))

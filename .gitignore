@@ -28,3 +28,8 @@ desktop/src-tauri/target/
 desktop/src-tauri/gen/
 desktop/src-tauri/bin/
 desktop/instalador/
+
+# Testes de ponta a ponta (dados e resultados gerados a cada rodada)
+frontend/e2e/.dados/
+frontend/test-results/
+frontend/playwright-report/
