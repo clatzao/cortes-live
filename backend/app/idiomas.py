@@ -127,9 +127,73 @@ def _traduzir_textos(textos: list[str], idioma: str, ctx: Contexto) -> list[str]
 
 
 def idioma_falado(projeto_id: int) -> str:
-    """Idioma da fala do projeto (o "misto" conta como português, o caso mais comum aqui)."""
+    """Idioma da fala do projeto ("misto" quando a fala muda de idioma; ver origens_das_frases)."""
     p = db.um("SELECT idioma FROM projetos WHERE id=?", (projeto_id,))
-    return p["idioma"] if p and p["idioma"] in IDIOMAS else "pt"
+    return p["idioma"] if p and (p["idioma"] in IDIOMAS or p["idioma"] == "misto") else "pt"
+
+
+# Palavras curtas muito comuns de cada idioma de escrita latina: a frase é do idioma com mais delas.
+_COMUNS = {
+    "pt": "que não nao é de do da um uma você voce eu ele ela isso esse essa muito mais tá ta pra para com mas tem foi vai "
+          "aqui então entao mano cara né ne meu minha nós nos agora também tambem sim já ja tô to ser fazer olha gente",
+    "en": "the you i it is that what this and to of a in not don't i'm it's was are have my we he she they so just "
+          "like oh yeah no do can what's go get got there here right now let's know",
+    "es": "que no el la los las es un una y de en yo tú tu él lo qué por para con pero muy más está esto eso hay "
+          "vamos sí bueno ahora también tengo tiene",
+    "fr": "le la les de des un une et est je tu il elle ce c'est pas que qui ne on nous vous avec pour mais très "
+          "oui non je suis ça bien",
+    "de": "der die das und ist ich du er sie es nicht ein eine mit was wie auf für ja nein auch noch so aber "
+          "hier jetzt wir ihr",
+    "it": "che non il lo la gli le è un una e di in io tu lui lei per con ma molto più sono questo quello sì ho "
+          "hai cosa adesso anche",
+    "nl": "de het een en is ik je jij hij zij niet wat dat dit met op voor maar ook nog ja nee hier nu wij",
+    "pl": "nie się jest to że co ja ty on ona tak na w z do ale jak już mi mnie tu teraz",
+    "tr": "bir ve bu da de ne ben sen o değil çok için ama evet hayır şimdi var yok mı mi",
+    "id": "yang dan ini itu tidak aku saya kamu dia ada apa di ke dari dengan untuk tapi sudah juga ya",
+    "vi": "không và là của có một tôi bạn anh em này đó được người đi làm rồi cũng",
+}
+_COMUNS_SET = {k: set(v.split()) for k, v in _COMUNS.items()}
+
+
+def idioma_do_texto(texto: str) -> str | None:
+    """Idioma provável de uma frase, só pelo texto (sem internet nem modelo). None = não deu para saber."""
+    letras = [ch for ch in texto if ch.isalpha()]
+    if not letras:
+        return None
+
+    def fracao(a: int, b: int) -> float:
+        return sum(a <= ord(ch) <= b for ch in letras) / len(letras)
+
+    if fracao(0x3040, 0x30FF) > 0.1:
+        return "ja"
+    if fracao(0xAC00, 0xD7AF) > 0.3:
+        return "ko"
+    if fracao(0x4E00, 0x9FFF) > 0.3:
+        return "zh"
+    if fracao(0x0400, 0x04FF) > 0.3:
+        return "uk" if any(ch in "іїєґІЇЄҐ" for ch in letras) else "ru"
+    if fracao(0x0600, 0x06FF) > 0.3:
+        return "ar"
+    if fracao(0x0900, 0x097F) > 0.3:
+        return "hi"
+    palavras = [w.strip(".,!?;:\"()…¿¡").lower() for w in texto.split()]
+    palavras = [w for w in palavras if w]
+    pontos = {k: sum(w in s for w in palavras) for k, s in _COMUNS_SET.items()}
+    melhor = max(pontos, key=pontos.get)
+    segundo = max(v for k, v in pontos.items() if k != melhor)
+    return melhor if pontos[melhor] >= 1 and pontos[melhor] > segundo else None
+
+
+def origens_das_frases(projeto_id: int, textos: list[str]) -> list[str]:
+    """Idioma de cada frase. Projeto de idioma fixo: todas nele. Misto: frase a frase, e a que não der para
+    saber (curta, só nomes) fica com o idioma mais comum do corte (português se nenhum)."""
+    falado = idioma_falado(projeto_id)
+    if falado != "misto":
+        return [falado] * len(textos)
+    achados = [idioma_do_texto(t) for t in textos]
+    contagem = {k: achados.count(k) for k in set(achados) if k}
+    comum = max(contagem, key=contagem.get) if contagem else "pt"
+    return [a or comum for a in achados]
 
 
 @jobs.registrar("traduzir", faixa="ia")
@@ -147,7 +211,13 @@ def traduzir(ctx: Contexto) -> str:
         textos, motor = _traduzir_textos(originais, idioma, ctx), "Gemini"
     else:
         from . import traducao_local
-        textos, motor = traducao_local.traduzir(originais, idioma_falado(c["projeto_id"]), idioma, ctx), "tradutor local"
+        motor = "tradutor local"
+        origens = origens_das_frases(c["projeto_id"], originais)
+        textos = list(originais)  # frase que já está no idioma pedido fica como está
+        for origem in sorted(set(origens) - {idioma}):
+            idx = [i for i, o in enumerate(origens) if o == origem]
+            for i, t in zip(idx, traducao_local.traduzir([originais[i] for i in idx], origem, idioma, ctx)):
+                textos[i] = t
     segs = [{"inicio": round(f["inicio"], 3), "fim": round(f["fim"], 3), "texto": t} for f, t in zip(frases, textos)]
     agora = db.agora()
     db.executar("INSERT INTO traducoes (corte_id, idioma, segmentos, editada, criado_em, atualizado_em) "

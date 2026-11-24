@@ -63,13 +63,17 @@ def estado(corte_id: int):
 @router.post("/api/cortes/{corte_id}/traducoes")
 def traduzir(corte_id: int, dados: PedidoTraducao):
     c = _corte(corte_id)
-    origem = idiomas.idioma_falado(c["projeto_id"])
-    if dados.idioma == origem:
-        raise HTTPException(400, f"O corte já está em {idiomas.IDIOMAS.get(origem, origem)}: escolha outro idioma.")
+    try:
+        textos = [f["texto"] for f in idiomas.frases_do_corte(c)]
+    except RuntimeError:
+        textos = []  # transcrição ainda não pronta: o job avisa
+    origens = set(idiomas.origens_das_frases(c["projeto_id"], textos)) if textos else {idiomas.idioma_falado(c["projeto_id"])}
+    if origens == {dados.idioma}:
+        raise HTTPException(400, f"O corte já está em {idiomas.IDIOMAS.get(dados.idioma, dados.idioma)}: escolha outro idioma.")
     if not ajustes.ler()["gemini_chave"]:  # sem chave: tradutor local; avisa na hora se o par não existir
         from .. import traducao_local
         try:
-            ok = traducao_local.rota(origem, dados.idioma) is not None
+            ok = all(traducao_local.rota(o, dados.idioma) is not None for o in origens - {dados.idioma, "misto"})
         except Exception as e:  # noqa: BLE001 - sem internet na 1a vez
             raise HTTPException(502, f"Não deu para baixar a lista de tradutores: {str(e)[:200]}") from e
         if not ok:
