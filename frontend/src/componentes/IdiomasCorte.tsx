@@ -143,8 +143,11 @@ export default function IdiomasCorte({ corte, onFechar, onSujo }: {
             <Languages size={15} aria-hidden="true" /> {trad ? "Traduzir de novo" : "Traduzir a legenda"}
           </button>
         </div>
-        <p className="sutil">A tradução usa o Gemini (Ajustes → IA e hardware). Cada frase mantém o tempo da fala original.</p>
-        <AvisoGemini motivo="A tradução precisa do Gemini." />
+        <p className="sutil">
+          Com a chave do Gemini a tradução sai mais natural (gírias); sem ela, o tradutor local traduz no PC (baixa uns 80 MB
+          por idioma na 1ª vez). Cada frase mantém o tempo da fala original.
+        </p>
+        <AvisoGemini motivo="Sem o Gemini, a tradução é feita pelo tradutor local, mais literal." />
 
         {traduzindo && jt && <Progresso valor={jt.progresso} texto={jt.mensagem} />}
         {jt?.status === "erro" && <div className="aviso aviso-erro" role="alert">{jt.mensagem}</div>}

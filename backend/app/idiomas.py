@@ -1,7 +1,7 @@
-"""Tradução da legenda (Gemini) e dublagem com vozes prontas (Piper, local).
+"""Tradução da legenda (Gemini, ou o tradutor local sem chave) e dublagem com vozes prontas (Piper, local).
 
-Tradução: as frases do corte vão para o Gemini numeradas e voltam na mesma ordem; cada frase mantém
-o tempo da original. A legenda traduzida reparte o tempo de cada frase entre as palavras.
+Tradução: as frases do corte vão para o Gemini numeradas e voltam na mesma ordem (sem chave, cada frase passa
+pelo tradutor local, ver traducao_local.py); cada frase mantém o tempo da original. A legenda traduzida reparte o tempo de cada frase entre as palavras.
 
 Dublagem: cada frase traduzida vira fala com a voz escolhida (Piper, ONNX, roda na CPU). Se a fala for
 mais longa que o espaço da frase, acelera até ACELERACAO_MAX; o que ainda sobrar invade a pausa seguinte.
@@ -126,6 +126,12 @@ def _traduzir_textos(textos: list[str], idioma: str, ctx: Contexto) -> list[str]
     return res
 
 
+def idioma_falado(projeto_id: int) -> str:
+    """Idioma da fala do projeto (o "misto" conta como português, o caso mais comum aqui)."""
+    p = db.um("SELECT idioma FROM projetos WHERE id=?", (projeto_id,))
+    return p["idioma"] if p and p["idioma"] in IDIOMAS else "pt"
+
+
 @jobs.registrar("traduzir", faixa="ia")
 def traduzir(ctx: Contexto) -> str:
     c = db.um("SELECT * FROM cortes WHERE id=?", (ctx.job["corte_id"],))
@@ -136,13 +142,18 @@ def traduzir(ctx: Contexto) -> str:
     if not frases:
         raise RuntimeError("Este corte não tem fala para traduzir.")
     ctx.progresso(0.2, f"Traduzindo {len(frases)} frase(s) para {IDIOMAS.get(idioma, idioma)}", forcar=True)
-    textos = _traduzir_textos([f["texto"] for f in frases], idioma, ctx)
+    originais = [f["texto"] for f in frases]
+    if ajustes.ler()["gemini_chave"]:
+        textos, motor = _traduzir_textos(originais, idioma, ctx), "Gemini"
+    else:
+        from . import traducao_local
+        textos, motor = traducao_local.traduzir(originais, idioma_falado(c["projeto_id"]), idioma, ctx), "tradutor local"
     segs = [{"inicio": round(f["inicio"], 3), "fim": round(f["fim"], 3), "texto": t} for f, t in zip(frases, textos)]
     agora = db.agora()
     db.executar("INSERT INTO traducoes (corte_id, idioma, segmentos, editada, criado_em, atualizado_em) "
                 "VALUES (?,?,?,0,?,?) ON CONFLICT(corte_id, idioma) DO UPDATE SET segmentos=excluded.segmentos, "
                 "editada=0, atualizado_em=excluded.atualizado_em", (c["id"], idioma, db.json_dump(segs), agora, agora))
-    return f"{len(segs)} frase(s) traduzida(s) para {IDIOMAS.get(idioma, idioma)}."
+    return f"{len(segs)} frase(s) traduzida(s) para {IDIOMAS.get(idioma, idioma)} ({motor})."
 
 
 # ---------------------------------------------------------------- vozes

@@ -9,7 +9,7 @@ test.describe("F04 idiomas e mídias", () => {
   });
   test.afterEach(() => expect(erros).toEqual([]));
 
-  test("F04-N1 traduzir sem chave do Gemini avisa e F04-N2 exportar sem tradução recusa", async ({ page, request }) => {
+  test("F04-N1 traduzir para o idioma da fala recusa e F04-N2 exportar sem tradução recusa", async ({ page, request }) => {
     const p = await projetoPronto(request);
     const c = await (await request.post(`/api/projetos/${p.id}/cortes`, { data: { inicio: 1, fim: 6, nome: "idioma" } })).json();
     const r = await request.post(`/api/cortes/${c.id}/exportar`, { data: { idioma: "es" } });
@@ -20,9 +20,10 @@ test.describe("F04 idiomas e mídias", () => {
     await page.getByRole("button", { name: /^Cortes \(1\)/ }).click();
     await page.getByRole("button", { name: "Editar" }).click();
     await page.getByRole("tab", { name: /Idiomas/ }).click();
+    // sem chave a tradução é local; para o mesmo idioma da fala recusa na hora (sem entrar na fila nem baixar nada)
+    await page.getByLabel("Idioma da versão").selectOption("pt");
     await page.getByRole("button", { name: "Traduzir a legenda" }).click();
-    // sem chave: recusa na hora, dizendo o que falta (sem entrar na fila)
-    await expect(page.getByText(/Configure a chave/).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/já está em Português/).first()).toBeVisible({ timeout: 5_000 });
     expect((await (await request.get("/api/fila")).json()).some((j: { tipo: string }) => j.tipo === "traduzir")).toBeFalsy();
     await expect(page.getByRole("button", { name: /Exportar em/ })).toBeDisabled();
     await semViolacoes(page, "Idiomas do corte");

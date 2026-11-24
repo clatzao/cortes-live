@@ -63,8 +63,17 @@ def estado(corte_id: int):
 @router.post("/api/cortes/{corte_id}/traducoes")
 def traduzir(corte_id: int, dados: PedidoTraducao):
     c = _corte(corte_id)
-    if not ajustes.ler()["gemini_chave"]:  # avisa na hora em vez de entrar na fila e falhar depois
-        raise HTTPException(400, "A tradução usa o Gemini. Configure a chave em Ajustes → IA e hardware.")
+    origem = idiomas.idioma_falado(c["projeto_id"])
+    if dados.idioma == origem:
+        raise HTTPException(400, f"O corte já está em {idiomas.IDIOMAS.get(origem, origem)}: escolha outro idioma.")
+    if not ajustes.ler()["gemini_chave"]:  # sem chave: tradutor local; avisa na hora se o par não existir
+        from .. import traducao_local
+        try:
+            ok = traducao_local.rota(origem, dados.idioma) is not None
+        except Exception as e:  # noqa: BLE001 - sem internet na 1a vez
+            raise HTTPException(502, f"Não deu para baixar a lista de tradutores: {str(e)[:200]}") from e
+        if not ok:
+            raise HTTPException(400, "Não há tradutor local para esse idioma. Configure o Gemini em Ajustes → IA e hardware.")
     jid = jobs.enfileirar("traduzir", projeto_id=c["projeto_id"], corte_id=corte_id, params={"idioma": dados.idioma},
                           mensagem="Aguardando para traduzir")
     return db.um("SELECT * FROM jobs WHERE id=?", (jid,))
