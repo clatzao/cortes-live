@@ -703,9 +703,21 @@ def disco_livre_gb() -> float:
     return shutil.disk_usage(config.PROJETOS).free / 1024 ** 3
 
 
+def fonte_do_trecho(projeto: dict, inicio: float, fim: float) -> tuple[str, float] | None:
+    """Durante a gravação: o arquivo da parte que tem o trecho inteiro (já gravado) e onde ela começa na live.
+
+    Cada queda da transmissão abre uma parte nova; um corte que atravessa a emenda só sai quando a live termina
+    (aí as partes viram um vídeo só).
+    """
+    if not projeto.get("live_id") or not (math.isfinite(inicio) and math.isfinite(fim)):
+        return None
+    for x in partes(projeto["live_id"]):
+        comeco = x["deslocamento_s"]
+        if inicio >= comeco and fim <= comeco + x["duracao_s"] - 1 and Path(x["caminho"]).is_file():
+            return x["caminho"], comeco
+    return None
+
+
 def parte_da_live(projeto: dict, inicio: float, fim: float) -> bool:
-    """Durante a gravação, um corte só pode ser exportado se estiver inteiro na 1ª parte e já gravado."""
-    if not projeto.get("live_id"):
-        return False
-    lista = partes(projeto["live_id"])
-    return bool(lista) and fim <= lista[0]["duracao_s"] - 1 and math.isfinite(inicio)
+    """Durante a gravação, um corte pode ser exportado se estiver inteiro numa parte já gravada."""
+    return fonte_do_trecho(projeto, inicio, fim) is not None

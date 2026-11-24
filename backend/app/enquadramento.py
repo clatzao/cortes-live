@@ -187,13 +187,19 @@ def trilha_valida(c: dict) -> list[list[float]] | None:
     return dados.get("pontos") or None
 
 
-def calcular_corte(c: dict, p: dict, ctx: Contexto) -> list[list[float]] | None:
-    """Calcula e salva a trilha do corte. None = nenhum rosto (o corte volta para o modo fixo)."""
+def calcular_corte(c: dict, p: dict, ctx: Contexto, deslocamento: float = 0.0) -> list[list[float]] | None:
+    """Calcula e salva a trilha do corte. None = nenhum rosto (o corte volta para o modo fixo).
+
+    deslocamento: onde o arquivo de origem começa na linha do tempo (parte 2+ de uma live ainda gravando).
+    """
     proxy = media.proxy_de(p["id"])
-    origem = str(proxy) if proxy.is_file() else p["caminho_original"]
+    if proxy.is_file():
+        origem, deslocamento = str(proxy), 0.0  # o proxy só existe com a live já fechada: linha do tempo inteira
+    else:
+        origem = p["caminho_original"]
     if not origem or not Path(origem).is_file():
         raise RuntimeError("O vídeo deste projeto não está disponível.")
-    pontos = calcular(origem, c["inicio"], c["fim"] - c["inicio"], p["largura"] or 1920, p["altura"] or 1080, ctx)
+    pontos = calcular(origem, c["inicio"] - deslocamento, c["fim"] - c["inicio"], p["largura"] or 1920, p["altura"] or 1080, ctx)
     if pontos is None:
         db.executar("UPDATE cortes SET enquadramento='fixo', trilha_foco=NULL WHERE id=?", (c["id"],))
         return None

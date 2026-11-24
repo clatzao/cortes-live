@@ -206,7 +206,8 @@ def exportar_corte(corte_id: int, dados: PedidoExportacao | None = None):
     if p["status"] == "gravando":
         from .. import live  # import tardio: só lives usam
         if not live.parte_da_live(p, c["inicio"], c["fim"]):
-            raise HTTPException(400, "Este corte só pode ser exportado quando a live terminar de gravar.")
+            raise HTTPException(400, "Este corte atravessa uma queda da live (ou ainda não foi todo gravado): ele "
+                                     "pode ser exportado quando a live terminar.")
     elif p["status"] != "pronto":
         raise HTTPException(400, "Aguarde o projeto terminar de processar.")
     lista = _validar_formatos(dados.formatos) if dados and dados.formatos else tarefas.formatos_do_corte(c, p)

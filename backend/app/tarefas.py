@@ -229,10 +229,15 @@ def exportar(ctx: Contexto) -> str:
     p = db.um("SELECT * FROM projetos WHERE id=?", (c["projeto_id"],))
     if not p or not p["caminho_original"]:
         raise RuntimeError("O projeto deste corte não está pronto.")
-    if p["status"] == "gravando":  # live ainda gravando: só cortes inteiros na 1ª parte (sem emendas)
+    deslocamento = 0.0
+    if p["status"] == "gravando":  # live ainda gravando: o corte sai do arquivo da parte que tem ele inteiro
         from . import live
-        if not live.parte_da_live(p, c["inicio"], c["fim"]):
-            raise RuntimeError("Este corte só pode ser exportado quando a live terminar de gravar.")
+        fonte = live.fonte_do_trecho(p, c["inicio"], c["fim"])
+        if not fonte:
+            raise RuntimeError("Este corte atravessa uma queda da live (ou ainda não foi todo gravado): ele pode ser "
+                               "exportado quando a live terminar.")
+        p = {**p, "caminho_original": fonte[0]}
+        deslocamento = fonte[1]
     elif p["status"] != "pronto":
         raise RuntimeError("O projeto deste corte não está pronto.")
     if not Path(p["caminho_original"]).is_file():
@@ -249,7 +254,7 @@ def exportar(ctx: Contexto) -> str:
     parcial = destino.with_name(destino.stem + ".parcial.mp4")
     temporaria = pasta_projeto(p["id"]) / f"export_{c['id']}_{ctx.id}"
     try:
-        montagem = preparar_montagem(c, p, fmt, temporaria, ctx, idioma=idioma)
+        montagem = preparar_montagem(c, p, fmt, temporaria, ctx, idioma=idioma, deslocamento=deslocamento)
         args, total = formatos.comando(montagem, hardware.args_video("final"), str(parcial))
         media.rodar_ffmpeg(args, total, ctx, 0.25, 0.75, f"Renderizando {formatos.FORMATOS[fmt]['nome']}")
         parcial.replace(destino)
@@ -300,8 +305,10 @@ class _SemContexto:
 
 def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | None = None,
                       previa_t: float | None = None, sobrescrever: dict | None = None,
-                      idioma: str | None = None) -> formatos.Montagem:
+                      idioma: str | None = None, deslocamento: float = 0.0) -> formatos.Montagem:
     """Monta tudo o que entra no vídeo (legenda, gancho, logo, música, intro/outro).
+
+    deslocamento: onde o arquivo de origem começa na linha do tempo (parte 2+ de uma live ainda gravando).
 
     previa_t: instante (relativo ao corte) para uma prévia de um quadro; sobrescrever: valores ainda
     não salvos vindos da tela (crop_x, layout, gancho) para a prévia ao vivo.
@@ -318,7 +325,7 @@ def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | N
     ow, oh = formatos.tamanho_saida(fmt, p["largura"], p["altura"], resolucao)
     duracao = c["fim"] - c["inicio"]
     mt = formatos.Montagem(
-        origem=str(proxy) if rapida else p["caminho_original"], fonte_reduzida=rapida, inicio=c["inicio"] + (previa_t or 0), duracao=duracao, fmt=fmt,
+        origem=str(proxy) if rapida else p["caminho_original"], fonte_reduzida=rapida, inicio=c["inicio"] - deslocamento + (previa_t or 0), duracao=duracao, fmt=fmt,
         largura=p["largura"], altura=p["altura"], fps=p["fps"] or 30, tem_audio=info["tem_audio"],
         crop_x=float(sobrescrever.get("crop_x", c["crop_x"] if c.get("crop_x") is not None else 0.5)),
         layout=layout, resolucao=resolucao,
@@ -327,7 +334,7 @@ def preparar_montagem(c: dict, p: dict, fmt: str, pasta: Path, ctx: Contexto | N
     if sobrescrever.get("enquadramento", c.get("enquadramento")) == "auto" and fmt in formatos.USA_RECORTE:
         pontos = enquadramento.trilha_valida(c)
         if pontos is None and not previa:
-            pontos = enquadramento.calcular_corte(c, p, ctx or _SemContexto())
+            pontos = enquadramento.calcular_corte(c, p, ctx or _SemContexto(), deslocamento)
         if pontos and previa:
             mt.crop_x = enquadramento.valor_em(pontos, previa_t or 0.0)
         elif pontos:

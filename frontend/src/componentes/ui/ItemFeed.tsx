@@ -53,7 +53,7 @@ export default function ItemFeed({ item, novo = false, aoAbrir, aoExportar, aoDe
           <Play size={15} aria-hidden="true" />
         </button>
         <button type="button" className="btn-icone" onClick={aoExportar} disabled={item.estado !== "pronto" || !aoExportar} aria-label={`Exportar ${item.nome}`}
-          title={aoExportar ? "Exportar" : "Exporta quando a live terminar de gravar"}>
+          title={aoExportar ? "Exportar" : "Atravessa uma queda da live: exporta quando a live terminar"}>
           <Download size={15} aria-hidden="true" />
         </button>
         <button type="button" className="btn-icone" onClick={aoDescartar} disabled={!aoDescartar} aria-label={`Descartar ${item.nome}`} title="Descartar">
